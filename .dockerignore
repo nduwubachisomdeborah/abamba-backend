@@ -4,8 +4,7 @@ node_modules
 # Environment files
 .env
 .env.*
-!.env.example
-!firebase-service-account.json
+firebase-service-account.json
 
 # Logs
 logs

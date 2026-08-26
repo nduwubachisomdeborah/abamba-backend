@@ -13,8 +13,6 @@ RUN bun install
 # Copy source code
 COPY src/ ./src/
 
-# Copy firebase service account file
-COPY firebase-service-account.json ./firebase-service-account.json
 
 # Create non-root user
 RUN addgroup -g 1001 -S bunuser
