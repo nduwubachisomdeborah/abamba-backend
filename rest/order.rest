@@ -1,0 +1,157 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@userAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzQ4MTE0MjcwLCJleHAiOjE3NTU4OTAyNzB9.MSoYWYd1EnCSPZJvF7euq-gEnkskFatDRPDYLjD9LK8
+@sellerAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZCIsInJvbGUiOiJzZWxsZXIiLCJpYXQiOjE3NDgxMTQyNzAsImV4cCI6MTc1NTg5MDI3MH0.gXk8RYT5eXGV4Qn8UBUBd9NY2xUTjMBEjr0hLH95emU
+@adminAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZiIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc0ODExNDI3MCwiZXhwIjoxNzU1ODkwMjcwfQ.7euq-gEnkskFatDRPDYLjD9LK8MSoYWYd1EnCSPZJvF
+
+### Create a New Order (with direct shipping address)
+# Creates an order from the user's current cart contents with an inline shipping address
+POST {{baseUrl}}/orders
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "shippingAddress": "6832a4b7f12345678912345h",
+  "paymentMethod": "transfer",
+  "provider": "paystack",
+  "notes": "Please leave at the front door"
+}
+
+### Create a New Order (using saved address)
+# Creates an order using a saved address from the user's address book
+POST {{baseUrl}}/orders
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "addressId": "6832a4b7f12345678912345h",
+  "paymentMethod": "credit_card",
+  "paymentDetails": {
+    "cardLast4": "4242",
+    "cardBrand": "Visa"
+  },
+  "shippingCost": 10.00,
+  "tax": 5.00,
+  "discount": 0,
+  "notes": "Please leave at the front door"
+}
+
+### Create a New Order (using default address)
+# Creates an order using the user's default address (no address ID or shipping address needed)
+POST {{baseUrl}}/orders
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "paymentMethod": "credit_card",
+  "paymentDetails": {
+    "cardLast4": "4242",
+    "cardBrand": "Visa"
+  },
+  "shippingCost": 10.00,
+  "tax": 5.00,
+  "discount": 0,
+  "notes": "Please deliver during business hours"
+}
+
+### Get All Orders (User)
+# Regular users can only see their own orders
+GET {{baseUrl}}/orders
+Authorization: Bearer {{userAuthToken}}
+
+### Get All Orders (Seller)
+# Sellers can see orders containing their products
+GET {{baseUrl}}/orders
+Authorization: Bearer {{sellerAuthToken}}
+
+### Get All Orders (Seller) with Filtering
+# Sellers can also use filtering options
+GET {{baseUrl}}/orders?page=1&limit=10&status=processing&startDate=2025-01-01&endDate=2025-12-31&sort=-createdAt
+Authorization: Bearer {{sellerAuthToken}}
+
+### Get All Orders (Admin)
+# Admins can see all orders with filtering options
+GET {{baseUrl}}/orders?page=1&limit=10&status=processing&startDate=2025-01-01&endDate=2025-12-31&sort=-createdAt
+Authorization: Bearer {{adminAuthToken}}
+
+### Get Order by ID (User)
+# Get details of a specific order as a customer
+GET {{baseUrl}}/orders/123456
+Authorization: Bearer {{userAuthToken}}
+
+### Get Order by ID (Seller)
+# Get details of a specific order as a seller
+# Only works if the order contains products sold by this seller
+GET {{baseUrl}}/orders/123456
+Authorization: Bearer {{sellerAuthToken}}
+
+### Get Order by ID (Admin)
+# Get details of a specific order as an admin
+GET {{baseUrl}}/orders/123456
+Authorization: Bearer {{adminAuthToken}}
+
+### Update Order Status (Admin only)
+# Change the status of an order
+PATCH {{baseUrl}}/orders/6832a4b7f12345678912345f/status
+Content-Type: application/json
+Authorization: Bearer {{adminAuthToken}}
+
+{
+  "status": "shipped"
+}
+
+### Update Order Payment (Admin only)
+# Update payment information for an order
+PATCH {{baseUrl}}/orders/6832a4b7f12345678912345f/payment
+Content-Type: application/json
+Authorization: Bearer {{adminAuthToken}}
+
+{
+  "status": "completed",
+  "transactionId": "txn_12345abcde",
+  "details": {
+    "paymentProcessor": "stripe",
+    "paymentTimestamp": "2025-05-27T12:30:45.000Z"
+  }
+}
+
+### Delete Order (Admin only - soft delete)
+# Soft delete an order
+DELETE {{baseUrl}}/orders/6832a4b7f12345678912345f
+Authorization: Bearer {{adminAuthToken}}
+
+### Create Order Holder (split per seller) and Initialize Payment
+# Creates an OrderHolder that groups child orders by seller and initializes payment with Paystack
+POST {{baseUrl}}/orders
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "shippingAddress": {
+    "fullName": "John Doe",
+    "addressLine1": "123 Main St",
+    "addressLine2": "Apt 4B",
+    "city": "Lagos",
+    "state": "LA",
+    "zipCode": "100001",
+    "country": "NG",
+    "phoneNumber": "+2348012345678"
+  },
+  "paymentMethod": "bank_transfer",
+  "provider": "paystack",
+  "shippingCost": 1500,
+  "tax": 0,
+  "discount": 0,
+  "callbackUrl": "http://localhost:3000/payment/callback",
+  "notes": "Ring the bell twice"
+}
+
+### Verify Payment and Finalize Orders (after provider success)
+# Use the reference returned from provider initialization (providerInit.data.reference)
+POST {{baseUrl}}/orders/payment/verify
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "reference": "PSK-EXAMPLE-REFERENCE-1699999999999"
+}

@@ -1,0 +1,155 @@
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{{subject}}</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            .container {
+                border: 1px solid #e0e0e0;
+                border-radius: 5px;
+                padding: 20px;
+            }
+            .header {
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            .header img {
+                max-width: 150px;
+            }
+            .status {
+                text-align: center;
+                margin: 20px 0;
+            }
+            .status-badge {
+                display: inline-block;
+                padding: 10px 25px;
+                border-radius: 25px;
+                font-weight: bold;
+                text-transform: uppercase;
+                font-size: 14px;
+            }
+            .status-pending {
+                background-color: #fff3cd;
+                color: #856404;
+            }
+            .status-in_transit {
+                background-color: #cce5ff;
+                color: #004085;
+            }
+            .status-delivered {
+                background-color: #d4edda;
+                color: #155724;
+            }
+            .status-failed {
+                background-color: #f8d7da;
+                color: #721c24;
+            }
+            .status-returned {
+                background-color: #e2e3e5;
+                color: #383d41;
+            }
+            .details {
+                background-color: #f9f9f9;
+                padding: 15px;
+                border-radius: 5px;
+                margin: 20px 0;
+            }
+            .details table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .details td {
+                padding: 8px 0;
+            }
+            .details td:first-child {
+                color: #666;
+                width: 40%;
+            }
+            .button {
+                display: inline-block;
+                background-color: #3498db;
+                color: white;
+                text-decoration: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                margin: 20px 0;
+            }
+            .footer {
+                font-size: 12px;
+                text-align: center;
+                color: #666;
+                margin-top: 30px;
+                padding-top: 10px;
+                border-top: 1px solid #e0e0e0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <img src="{{logoUrl}}" alt="{{companyName}} Logo" />
+                <h1>Shipment Update</h1>
+            </div>
+
+            <div class="status">
+                <span
+                    class="status-badge status-{{status}}"
+                >{{statusText}}</span>
+            </div>
+
+            <p>Hello {{name}},</p>
+            <p>{{message}}</p>
+
+            <div class="details">
+                <table>
+                    <tr>
+                        <td>Tracking Number:</td>
+                        <td><strong>{{trackingNumber}}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Courier:</td>
+                        <td>{{courierName}}</td>
+                    </tr>
+                    {{#if orderId}}
+                        <tr>
+                            <td>Order ID:</td>
+                            <td>#{{orderId}}</td>
+                        </tr>
+                    {{/if}}
+                </table>
+            </div>
+
+            {{#if trackingUrl}}
+                <p style="text-align: center;">
+                    <a href="{{trackingUrl}}" class="button">Track Your Shipment</a>
+                </p>
+            {{/if}}
+
+            {{#if waybillDocument}}
+                <p style="text-align: center;">
+                    <a
+                        href="{{waybillDocument}}"
+                        class="button"
+                        style="background-color: #6c757d;"
+                    >Download Waybill</a>
+                </p>
+            {{/if}}
+
+            <p>If you have any questions, our support team is here to help.</p>
+
+            <div class="footer">
+                <p>&copy; {{year}} {{companyName}}. All rights reserved.</p>
+                <p>Need help? Contact us at
+                    <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+            </div>
+        </div>
+    </body>
+</html>

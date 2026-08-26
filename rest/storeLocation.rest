@@ -1,0 +1,57 @@
+### Store Location API Tests
+
+@baseUrl = http://localhost:3000/api/v1
+@userAuthToken = REPLACE_WITH_USER_TOKEN
+@adminAuthToken = REPLACE_WITH_ADMIN_TOKEN
+@contentType = application/json
+
+### Get enabled store locations (requires auth)
+GET {{baseUrl}}/store-locations
+Content-Type: {{contentType}}
+Authorization: Bearer {{userAuthToken}}
+
+### Get enabled store locations (same as above)
+GET {{baseUrl}}/store-locations
+Content-Type: {{contentType}}
+Authorization: Bearer {{userAuthToken}}
+
+### Get store locations (deprecated query includeDisabled no longer supported)
+GET {{baseUrl}}/store-locations
+Content-Type: {{contentType}}
+Authorization: Bearer {{userAuthToken}}
+
+### Get store location by ID (replace with actual ID)
+GET {{baseUrl}}/store-locations/507f1f77bcf86cd799439011
+Content-Type: {{contentType}}
+Authorization: Bearer {{userAuthToken}}
+
+### Get store location by address code
+GET {{baseUrl}}/store-locations/address/NYC001
+Content-Type: {{contentType}}
+Authorization: Bearer {{userAuthToken}}
+
+### Create a new store location (requires authentication)
+POST {{baseUrl}}/store-locations
+Content-Type: {{contentType}}
+Authorization: Bearer {{adminAuthToken}}
+
+{
+    "addressCode": "NYC001",
+    "name": "New York Central Store",
+    "disabled": false
+}
+
+### Update store location (requires authentication)
+PATCH {{baseUrl}}/store-locations/507f1f77bcf86cd799439011
+Content-Type: {{contentType}}
+Authorization: Bearer {{adminAuthToken}}
+
+{
+    "name": "Updated Store Name",
+    "disabled": false
+}
+
+### Delete store location (soft delete - requires authentication)
+DELETE {{baseUrl}}/store-locations/507f1f77bcf86cd799439011
+Content-Type: {{contentType}}
+Authorization: Bearer {{adminAuthToken}}

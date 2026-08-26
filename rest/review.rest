@@ -1,0 +1,145 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@authToken = your_auth_token_here
+@productId = product_id_here
+@reviewId = review_id_here
+
+### Get all reviews with pagination and filtering
+GET {{baseUrl}}/reviews?page=1&limit=10&sort=-createdAt&status=published
+
+# Query parameters:
+# page: Page number (default: 1)
+# limit: Number of items per page (default: 10)
+# sort: Sort field with direction, e.g., -createdAt (newest first)
+# status: Filter by status (published, pending, rejected)
+
+### Get reviews for a specific product
+GET {{baseUrl}}/reviews/{{productId}}/reviews?rating=5&sort=-createdAt
+
+# Query parameters:
+# rating: Filter by rating (1-5)
+# sort: Sort field with direction
+# verified: Set to 'true' to get only verified reviews
+# page: Page number
+# limit: Number of items per page
+
+### Get review by ID
+GET {{baseUrl}}/reviews/{{reviewId}}
+
+# Returns a single review object with:
+# - rating (1-5)
+# - title
+# - comment
+# - photos
+# - product reference
+# - user reference
+# - helpful/unhelpful counts
+# - status
+# - verified flag
+
+### Check if user can review a product
+GET {{baseUrl}}/reviews/{{productId}}/reviews/can-review
+Authorization: Bearer {{authToken}}
+
+# Checks if the authenticated user is eligible to review a product.
+# Returns eligibility status with:
+# - canReview: boolean indicating if user can review the product
+# - reason: explanation message
+# - hasPurchased: boolean indicating if user has purchased the product
+# - hasExistingReview: boolean indicating if user already reviewed the product
+# - existingReviewId: ID of existing review (if applicable)
+#
+# Requirements:
+# - User must be authenticated
+# - User must have a delivered order containing the product
+# - User must not have already reviewed the product
+
+### Create a new review (requires delivered order)
+POST {{baseUrl}}/reviews/{{productId}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "rating": 5,
+  "title": "Amazing product!",
+  "comment": "This is one of the best products I've ever purchased. The quality is exceptional.",
+  "photos": [
+    {
+      "url": "https://example.com/review-photo1.jpg",
+      "caption": "Product in use"
+    }
+  ]
+  // "variant": "optional_variant_id_if_reviewing_specific_variant"
+}
+
+# Only users with a delivered order containing the product (and variant if provided)
+# can create a review. Otherwise, the API returns 403.
+
+### Update a review
+PUT {{baseUrl}}/reviews/{{reviewId}}
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "rating": 4,
+  "title": "Updated opinion",
+  "comment": "After using this product for a month, I still think it's great but there are a few minor issues I've discovered."
+}
+
+### Delete a review (soft delete)
+DELETE {{baseUrl}}/reviews/{{reviewId}}
+Authorization: Bearer {{authToken}}
+
+### Mark a review as helpful
+POST {{baseUrl}}/reviews/{{reviewId}}/helpful
+Authorization: Bearer {{authToken}}
+
+# This endpoint allows users to mark a review as helpful.
+# Each user can only mark a review as helpful once.
+# The helpfulCount is incremented when a user marks a review as helpful.
+
+### Mark a review as unhelpful
+POST {{baseUrl}}/reviews/{{reviewId}}/unhelpful
+Authorization: Bearer {{authToken}}
+
+# This endpoint allows users to mark a review as unhelpful.
+# Each user can only mark a review as unhelpful once.
+# The unhelpfulCount is incremented when a user marks a review as unhelpful.
+
+### Admin: Add a reply to a review
+POST {{baseUrl}}/reviews/{{reviewId}}/reply
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "content": "Thank you for your feedback. We appreciate your review and are glad you're enjoying the product. If you have any questions, please contact our support team."
+}
+
+# Allows admins to add official replies to reviews.
+# Each review can have one official reply which can be updated.
+# The reply includes information about who posted it and when.
+
+### Admin: Update review status
+PATCH {{baseUrl}}/reviews/{{reviewId}}/status
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "status": "published"           // Options: "published", "pending", "rejected"
+}
+
+# Allows admins to change the status of a review
+# - published: Visible to all users
+# - pending: Under review, not publicly visible
+# - rejected: Review violates guidelines, not publicly visible
+#
+# Note: When a review status changes, the product's rating statistics are
+# automatically recalculated to include only published reviews.
+
+### Admin: Mark a review as verified
+PATCH {{baseUrl}}/reviews/{{reviewId}}/verify
+Authorization: Bearer {{authToken}}
+
+# Allows admins to mark a review as verified purchase.
+# Verified reviews indicate that the reviewer actually purchased the product.
+# Verification status is shown in the review object and can be used for filtering.

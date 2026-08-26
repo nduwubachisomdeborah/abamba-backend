@@ -1,0 +1,16 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@authToken = your_user_token_here
+@notificationId = notification_id_here
+
+### Get My Notifications
+GET {{baseUrl}}/notifications?page=1&limit=20
+Authorization: Bearer {{authToken}}
+
+### Get Unread Notification Count
+GET {{baseUrl}}/notifications/unread/count
+Authorization: Bearer {{authToken}}
+
+### Mark Notification As Read
+PATCH {{baseUrl}}/notifications/{{notificationId}}/read
+Authorization: Bearer {{authToken}}

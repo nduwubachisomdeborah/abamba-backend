@@ -1,0 +1,443 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NTIxYWQ0ZDkxMWI0NTYyNTU0ODM5YyIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzUxMzE5MDc3LCJleHAiOjE3ODI4NzY2Nzd9.31drnjQuMc5YrdWFg9y7-GOP9txusKqjKnG2wce5fYs
+@productId = 68521cf732c1e858d41139db
+@variantId = variant_id_here
+
+### Documentation: Rating Statistics Fields
+# When retrieving products with includeRatingStats=true, the response will include:
+#
+# ratingStats: {
+#   distribution: [                  // Array of counts for each rating level
+#     { rating: 1, count: 34 },      // Count of 1-star ratings
+#     { rating: 2, count: 56 },      // Count of 2-star ratings
+#     { rating: 3, count: 123 },     // Count of 3-star ratings
+#     { rating: 4, count: 4566 },    // Count of 4-star ratings
+#     { rating: 5, count: 24440 }    // Count of 5-star ratings
+#   ],
+#   averageRating: 4.8,              // Average rating (1 decimal place)
+#   totalReviews: 29219              // Total number of reviews
+# }
+
+### Get all unique brands and categories
+GET {{baseUrl}}/products/brands-categories?search=Zieme&sort=asc
+# Returns all unique brands and categories for filtering purposes
+# Response format: { "brands": ["Brand1", "Brand2"], "categories": ["Category1", "Category2"] }
+
+### Get all products
+GET {{baseUrl}}/products
+
+# Query parameters:
+# page: Page number (default: 1)
+# limit: Number of items per page (default: 10)
+# sort: Sort field with direction, e.g., -createdAt (newest first)
+# minPrice/maxPrice: Filter by price range
+# category: Filter by category name
+# brand: Filter by brand name
+# featured: Set to 'true' to get only featured products
+
+### Get all products with rating statistics
+GET {{baseUrl}}/products?includeRatingStats=true&brand=Ankunding and Sons
+
+# The includeRatingStats parameter adds detailed rating information to each product
+# This includes counts for each rating level (1-5), average rating, and total reviews
+# See the Rating Statistics Fields documentation above for details
+
+### Get all products (authenticated - enhanced with user-specific data)
+GET {{baseUrl}}/products
+Authorization: Bearer {{authToken}}
+
+# When authenticated, the response may include enhanced features:
+# - Wishlist status for each product (if applicable)
+# - Personalized recommendations
+# - User-specific pricing or promotions
+# - View history tracking
+# Note: The same endpoint works for both authenticated and non-authenticated users
+
+### Get all products (no authentication - basic functionality)
+GET {{baseUrl}}/products
+
+# Without authentication, you get the basic product listing
+# All public product information is available
+# Enhanced features requiring user context are not included
+
+### Optional Authentication Examples
+# The optionalAuthenticate middleware can be configured with different auth strategies:
+#
+# Basic usage (default authenticate middleware):
+# router.get('/products', optionalAuth, controller);
+#
+# With specific auth middleware:
+# router.get('/products', optionalAuthenticate(authenticate), controller);
+# router.get('/admin-products', optionalAuthenticate(adminOnly), controller);
+# router.get('/seller-products', optionalAuthenticate(verifiedSellerOnly), controller);
+#
+# Benefits:
+# - Same endpoint works for authenticated and anonymous users
+# - Enhanced features for authenticated users
+# - Graceful degradation for failed authentication
+# - Flexible authentication strategies
+
+### Get all products with filtering
+GET {{baseUrl}}/products?category=electronics&minPrice=100&maxPrice=500&featured=true&sort=-basePrice&brand=TechCorp
+
+# This example demonstrates combining multiple filters:
+# - Products in the 'electronics' category
+# - Price between $100 and $500
+# - Only featured products
+# - Sorted by base price (highest first)
+# - From brand 'TechCorp'
+
+### Get products by seller ID
+GET {{baseUrl}}/products?sellerId=68521cf732c1e858d41139d8
+
+# Filter products by a specific seller/user ID
+# This returns only products created by the specified seller
+# Useful for:
+# - Displaying a seller's product catalog
+# - Seller management interfaces
+# - Marketplace vendor pages
+
+### Get products by seller ID with additional filters
+GET {{baseUrl}}/products?sellerId=68521cf732c1e858d41139d8&category=electronics&featured=true&sort=-createdAt
+
+# Combine seller filtering with other filters:
+# - Products from a specific seller
+# - In the 'electronics' category
+# - Only featured products
+# - Sorted by creation date (newest first)
+
+### Get products with pagination
+GET {{baseUrl}}/products?page=2&limit=10
+
+# Pagination parameters:
+# page: The page number to retrieve (starts at 1)
+# limit: Number of products per page
+#
+# The response includes pagination metadata:
+# {
+#   "data": [...],
+#   "pagination": {
+#     "total": 100,       // Total number of products matching the query
+#     "page": 2,         // Current page number
+#     "pages": 10,       // Total number of pages
+#     "limit": 10        // Items per page
+#   }
+# }
+
+### Get products with variant attribute filtering
+GET {{baseUrl}}/products?attributes={"color":"Black","ram":"8GB"}&inStock=true
+
+### Get product by ID
+GET {{baseUrl}}/products/{{productId}}
+
+# Returns a single product with all its details including:
+# - Basic info (name, description, SKU)
+# - Pricing (basePrice, discountPrice)
+# - Inventory (stock, variants)
+# - Media (images, videos)
+# - Categories and attributes
+# - Simple rating (average)
+# - Wishlist information (for authenticated users):
+#   {
+#     "wishlistInfo": {
+#       "isInWishlist": true,
+#       "wishlist": {
+#         "id": "wishlist_id",
+#         "name": "Wishlist",
+#         "addedAt": "2024-01-15T10:30:00Z",
+#         "notes": "Optional notes"
+#       }
+#     }
+#   }
+
+### Get product by ID with rating statistics
+GET {{baseUrl}}/products/{{productId}}?includeRatingStats=true
+
+# Returns the product with additional rating statistics:
+# - distribution: Counts for each rating level (1-5 stars)
+# - averageRating: Average rating rounded to 1 decimal place
+# - totalReviews: Total number of reviews for the product
+#
+# Example response excerpt:
+# {
+#   "data": {
+#     "_id": "product_id",
+#     "name": "Product Name",
+#     ...
+#     "ratingStats": {
+#       "distribution": [
+#         { "rating": 1, "count": 34 },
+#         { "rating": 2, "count": 56 },
+#         { "rating": 3, "count": 123 },
+#         { "rating": 4, "count": 4566 },
+#         { "rating": 5, "count": 24440 }
+#       ],
+#       "averageRating": 4.8,
+#       "totalReviews": 29219
+#     }
+#   }
+# }
+
+### Get product by ID (authenticated user - includes wishlist info)
+GET {{baseUrl}}/products/{{productId}}
+Authorization: Bearer {{authToken}}
+
+# When authenticated, the response includes wishlist information:
+# {
+#   "data": {
+#     "_id": "product_id",
+#     "name": "Product Name",
+#     ...
+#     "wishlistInfo": {
+#       "isInWishlist": true,        // Whether product is in user's wishlist
+#       "wishlist": {               // Wishlist details if product is found
+#         "id": "wishlist_id",
+#         "name": "Wishlist",
+#         "addedAt": "2024-01-15T10:30:00Z",
+#         "notes": "Want this for my birthday"
+#       }
+#     }
+#   }
+# }
+# If not in wishlist: "wishlistInfo": { "isInWishlist": false, "wishlist": null }
+
+### Get featured products
+GET {{baseUrl}}/products/featured?limit=3
+
+# Query parameters:
+# limit: Maximum number of featured products to return (default: 5)
+# The featured products are sorted by rating (highest first)
+
+### Get featured products with rating statistics
+GET {{baseUrl}}/products/featured?limit=3&includeRatingStats=true
+
+# Returns featured products with detailed rating statistics
+# See the Rating Statistics Fields documentation above for details on the rating stats format
+
+### Create new product with variants
+POST {{baseUrl}}/products
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Smartphone X Pro",           // Required: Product name
+  "description": "The latest flagship smartphone with advanced features", // Required: Product description
+  "basePrice": 999.99,                 // Required: Base price of the product
+  "discountPrice": 899.99,             // Optional: Discounted price (if on sale)
+  "sku": "SPHX-PRO-001",               // Required: Stock keeping unit (unique identifier)
+  "stock": 100,                        // Required: Available stock quantity
+  "featured": true,                    // Optional: Whether this is a featured product
+  "categories": ["electronics", "smartphones"], // Required: Product categories
+  "brand": "TechBrand",                // Optional: Product brand
+  "attributes": {                      // Optional: Product attributes (key-value pairs)
+    "color": "black",
+    "weight": "189g",
+    "dimensions": "146.7 x 71.5 x 7.4 mm",
+    "display": "6.1 inches, OLED",
+    "processor": "OctaCore 2.5GHz"
+  },
+  "images": [                          // Optional: Product images
+    {
+      "url": "https://example.com/smartphone-x-pro.jpg", // Required: Image URL
+      "alt": "Smartphone X Pro - Front view",           // Optional: Alt text
+      "isThumbnail": true                              // Optional: Whether this is the thumbnail
+    }
+  ],
+  "variants": [                        // Optional: Product variants
+    {
+      "attributes": {                  // Required: Variant-specific attributes
+        "color": "Black",
+        "storage": "128GB",
+        "ram": "8GB"
+      },
+      "sku": "SPHX-PRO-BLK-128",       // Required: Variant SKU
+      "price": 899.99,                 // Required: Variant price
+      "stock": 50,                     // Required: Variant stock
+      "images": [                      // Optional: Variant-specific images
+        {
+          "url": "https://example.com/smartphone-x-pro-black.jpg",
+          "alt": "Smartphone X Pro - Black"
+        }
+      ]
+    },
+    {
+      "attributes": {
+        "color": "Silver",
+        "storage": "256GB",
+        "ram": "12GB"
+      },
+      "sku": "SPHX-PRO-SLV-256",
+      "price": 1099.99,
+      "stock": 30,
+      "images": [
+        {
+          "url": "https://example.com/smartphone-x-pro-silver.jpg",
+          "alt": "Smartphone X Pro - Silver"
+        }
+      ]
+    }
+  ]
+}
+
+# Note: When a product is created, its rating starts at 0
+# Ratings are automatically updated when reviews are added
+
+### Update product
+PUT {{baseUrl}}/products/{{productId}}
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Smartphone X Pro",
+  "basePrice": 799.99,
+  "brand": "TechBrand Pro",
+  "featured": true
+}
+
+### Delete a product (soft delete)
+DELETE {{baseUrl}}/products/{{productId}}
+Authorization: Bearer {{authToken}}
+
+# This performs a soft delete - the product is marked as deleted but remains in the database
+# The product will no longer appear in search results or listings
+# The deleted field is set to true and deletedAt is set to the current timestamp
+
+### Get product statistics
+GET {{baseUrl}}/products/stats
+Authorization: Bearer {{authToken}}
+
+# Returns aggregate statistics about products
+# - Total product count
+# - Count by category
+# - Count by brand
+# - Average price
+# - Stock information
+#
+# This endpoint requires admin access
+
+### Get all variants for a product
+GET {{baseUrl}}/products/{{productId}}/variants
+
+# Returns an array of all variants for the specified product
+# Each variant includes:
+# - Variant ID
+# - Attributes (color, size, storage, etc.)
+# - SKU
+# - Price
+# - Stock
+# - Images
+
+### Get a specific variant
+GET {{baseUrl}}/products/{{productId}}/variants/{{variantId}}
+
+# Returns detailed information about a specific variant
+# The response includes all variant details and relationships to the parent product
+
+### Add a variant to a product
+POST {{baseUrl}}/products/{{productId}}/variants
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "attributes": {                  // Required: Variant-specific attributes
+    "color": "Red",                // These attributes distinguish this variant
+    "storage": "512GB",            // from other variants of the same product
+    "ram": "16GB"                  // The keys can be any attribute relevant to the product
+  },
+  "sku": "SPHX-PRO-RED-512",       // Required: Variant SKU (must be unique)
+  "price": 1299.99,                 // Required: Variant price
+  "stock": 15,                      // Required: Variant stock
+  "images": [                       // Optional: Variant-specific images
+    {
+      "url": "https://example.com/smartphone-x-pro-red.jpg",
+      "alt": "Smartphone X Pro - Red"
+    }
+  ]
+}
+
+# Note: Variants can have their own reviews. When viewing product statistics with
+# includeRatingStats=true, the ratings include reviews for all variants.
+
+### Update a variant
+PUT {{baseUrl}}/products/{{productId}}/variants/{{variantId}}
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "price": 1199.99,                 // Optional: New price for the variant
+  "stock": 25                       // Optional: Updated stock quantity
+}
+
+# Note: You can update any combination of variant fields
+# Fields not included in the request will remain unchanged
+
+### Update variant stock only
+PATCH {{baseUrl}}/products/{{productId}}/variants/{{variantId}}/stock
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "quantity": 40
+}
+
+### Delete a variant
+DELETE {{baseUrl}}/products/{{productId}}/variants/{{variantId}}
+Authorization: Bearer {{authToken}}
+
+### Add a product viewed
+POST {{baseUrl}}/products/viewed/{{productId}}
+Authorization: Bearer {{authToken}}
+
+### Get product viewed
+GET {{baseUrl}}/products/viewed?limit=10
+Authorization: Bearer {{authToken}}
+
+### Get all category options
+GET {{baseUrl}}/products/category-options
+
+# Returns all category options for each product category
+# Each category has its own set of options with fields:
+# - id: Unique identifier for the option (e.g., "color", "size")
+# - name: Display name for the option (e.g., "Color", "Size")
+# - values: Array of possible values for this option
+# - type: Type of option UI ("color", "dropdown", "text")
+# - immutable: Whether the option can be modified
+
+### Get options for a specific category
+GET {{baseUrl}}/products/category-options/Electronics
+
+# Path parameter: category name (Electronics, Clothing, Furniture, Books, Food, Other)
+# Returns options for just that specific category
+
+### Update options for a category (admin only)
+PUT {{baseUrl}}/products/category-options/Electronics
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "options": [
+    { 
+      "id": "color", 
+      "name": "Color", 
+      "values": ["Black", "Silver", "White", "Gold"], 
+      "type": "color", 
+      "immutable": true 
+    },
+    { 
+      "id": "storage", 
+      "name": "Storage Capacity", 
+      "values": ["64GB", "128GB", "256GB", "512GB", "1TB"], 
+      "type": "dropdown" 
+    },
+    { 
+      "id": "connectivity", 
+      "name": "Connectivity", 
+      "values": ["WiFi", "Bluetooth", "5G", "4G LTE"], 
+      "type": "dropdown" 
+    }
+  ]
+}
+
+# Note: You cannot update immutable options
+# The update will replace all non-immutable options for the category

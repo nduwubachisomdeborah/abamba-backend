@@ -1,0 +1,46 @@
+@baseUrl = http://localhost:3000/api/v1
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NjNjMzRmMDNiZDMxY2NlYzdiNTJiNiIsInJvbGUiOiJzZWxsZXIiLCJpYXQiOjE3NTEzNjkyOTIsImV4cCI6MTc4MjkyNjg5Mn0.SLncd9UZMNm35EK5bsJMryl-hiyfgah6hEM-VPYRk3E
+
+### Get all customers who purchased from this seller
+GET {{baseUrl}}/customers
+Authorization: Bearer {{token}}
+
+### Get all customers with pagination and search
+GET {{baseUrl}}/customers?page=1&limit=10&search=john&sortBy=lastPurchaseDate&sortOrder=desc
+Authorization: Bearer {{token}}
+
+### Get a specific customer by ID
+GET {{baseUrl}}/customers/5f9d5c6b8e1c3e2d1c8f7b5a
+Authorization: Bearer {{token}}
+
+### Get orders from a specific customer
+GET {{baseUrl}}/customers/5f9d5c6b8e1c3e2d1c8f7b5a/orders
+Authorization: Bearer {{token}}
+
+### Get orders from a specific customer with filters
+GET {{baseUrl}}/customers/5f9d5c6b8e1c3e2d1c8f7b5a/orders?status=completed&page=1&limit=10&sortBy=createdAt&sortOrder=desc
+Authorization: Bearer {{token}}
+
+### Get customer metrics overview for dashboard
+GET {{baseUrl}}/customers/metrics/overview
+Authorization: Bearer {{token}}
+
+### Get recent customers
+GET {{baseUrl}}/customers/metrics/recent?limit=5
+Authorization: Bearer {{token}}
+
+### Get top customers for this month
+GET {{baseUrl}}/customers/metrics/top?limit=10&period=month
+Authorization: Bearer {{token}}
+
+### Get top customers for all time
+GET {{baseUrl}}/customers/metrics/top?period=all
+Authorization: Bearer {{token}}
+
+### Get order history
+GET {{baseUrl}}/customers/orders
+Authorization: Bearer {{token}}
+
+### Get order history with pagination and filtering
+GET {{baseUrl}}/customers/orders?page=1&limit=10&status=completed
+Authorization: Bearer {{token}}

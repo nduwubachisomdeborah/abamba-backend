@@ -1,0 +1,23 @@
+services:
+    app:
+        build: .
+        container_name: abamba-prod
+        ports:
+            - "5500:5500"
+        environment:
+            - NODE_ENV=production
+            - MONGODB_URI=mongodb://abamba:HzfJuQcNNn1@mongo:27017/abamba?authSource=admin
+        env_file:
+            - .env
+        volumes:
+            - ./src/logs:/app/src/logs
+            - ./.env:/app/.env:ro
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD", "wget", "-q", "http://localhost:5500/health"]
+            interval: 120s
+            timeout: 10s
+            retries: 3
+
+volumes:
+    mongo-data:

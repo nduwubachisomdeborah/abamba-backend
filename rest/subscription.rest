@@ -1,0 +1,38 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@userAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzQ4MTE0MjcwLCJleHAiOjE3NTU4OTAyNzB9.MSoYWYd1EnCSPZJvF7euq-gEnkskFatDRPDYLjD9LK8
+@adminAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZiIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc0ODExNDI3MCwiZXhwIjoxNzU1ODkwMjcwfQ.7euq-gEnkskFatDRPDYLjD9LK8MSoYWYd1EnCSPZJvF
+
+### Subscribe to Email Updates
+# Public endpoint for subscribing to email communications
+POST {{baseUrl}}/subscriptions
+Content-Type: application/json
+
+{
+  "email": "customer@example.com"
+}
+
+### Confirm Subscription
+# User clicks this link from their email to confirm subscription
+GET {{baseUrl}}/subscriptions/confirm/abcdef123456789abcdef123456789abcdef123456789abcdef123456789
+
+### Unsubscribe
+# User clicks this link from their email to unsubscribe
+GET {{baseUrl}}/subscriptions/unsubscribe/abcdef123456789abcdef123456789abcdef123456789abcdef123456789
+
+# Preferences endpoint removed as we no longer store preferences
+
+### Get All Subscriptions (Admin)
+# Admin endpoint to get all subscriptions with optional filtering
+GET {{baseUrl}}/subscriptions?page=1&limit=10&status=confirmed&source=website
+Authorization: Bearer {{adminAuthToken}}
+
+### Get Subscription by Email (Admin)
+# Admin endpoint to get a specific subscription by email
+GET {{baseUrl}}/subscriptions/customer@example.com
+Authorization: Bearer {{adminAuthToken}}
+
+### Delete Subscription (Admin)
+# Admin endpoint to delete a subscription
+DELETE {{baseUrl}}/subscriptions/customer@example.com
+Authorization: Bearer {{adminAuthToken}}

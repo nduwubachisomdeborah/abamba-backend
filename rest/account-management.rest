@@ -1,0 +1,60 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@userAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzQ4MTE0MjcwLCJleHAiOjE3NTU4OTAyNzB9.MSoYWYd1EnCSPZJvF7euq-gEnkskFatDRPDYLjD9LK8
+@sellerAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZCIsInJvbGUiOiJzZWxsZXIiLCJpYXQiOjE3NDgxMTQyNzAsImV4cCI6MTc1NTg5MDI3MH0.gXk8RYT5eXGV4Qn8UBUBd9NY2xUTjMBEjr0hLH95emU
+@adminAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZiIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc0ODExNDI3MCwiZXhwIjoxNzU1ODkwMjcwfQ.7euq-gEnkskFatDRPDYLjD9LK8MSoYWYd1EnCSPZJvF
+
+### Get Account Status (Self)
+# User checks their own account status
+GET {{baseUrl}}/users/6832a4b7f12345678912345h/status
+Authorization: Bearer {{userAuthToken}}
+
+### Get Account Status (Admin)
+# Admin checks any user's account status
+GET {{baseUrl}}/users/6832a4b7f12345678912345h/status
+Authorization: Bearer {{adminAuthToken}}
+
+### Disable Account (Self)
+# User disables their own account
+PATCH {{baseUrl}}/users/6832a4b7f12345678912345h/disable
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "reason": "Taking a break from the platform"
+}
+
+### Disable Account (Admin)
+# Admin disables any user's account
+PATCH {{baseUrl}}/users/6832a4b7f12345678912345h/disable
+Content-Type: application/json
+Authorization: Bearer {{adminAuthToken}}
+
+{
+  "reason": "Account violated platform terms of service - multiple spam reports"
+}
+
+### Enable Account (Admin Only)
+# Only admins can enable accounts
+PATCH {{baseUrl}}/users/6832a4b7f12345678912345h/enable
+Authorization: Bearer {{adminAuthToken}}
+
+### Enable Account (Unauthorized - User)
+# Regular users cannot enable accounts (this should fail)
+PATCH {{baseUrl}}/users/6832a4b7f12345678912345h/enable
+Authorization: Bearer {{userAuthToken}}
+
+### Enable Account (Unauthorized - Seller)
+# Sellers cannot enable accounts (this should fail)
+PATCH {{baseUrl}}/users/6832a4b7f12345678912345h/enable
+Authorization: Bearer {{sellerAuthToken}}
+
+### Disable Another User's Account (Unauthorized)
+# Regular users cannot disable other users' accounts (this should fail)
+PATCH {{baseUrl}}/users/6832a4b7f12345678912345i/disable
+Authorization: Bearer {{userAuthToken}}
+
+### Check Status of Another User's Account (Unauthorized)
+# Regular users cannot check other users' account status (this should fail)
+GET {{baseUrl}}/users/6832a4b7f12345678912345i/status
+Authorization: Bearer {{userAuthToken}}

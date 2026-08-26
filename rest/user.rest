@@ -1,0 +1,63 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@authToken = your_auth_token_here
+@userId = user_id_here
+
+### Get current user profile
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{authToken}}
+
+### Get all users (Admin only)
+GET {{baseUrl}}/users
+Authorization: Bearer {{authToken}}
+
+### Get user by ID (Admin only)
+GET {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{authToken}}
+
+### Update user
+PUT {{baseUrl}}/users/{{userId}}
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Jane Smith Updated",
+  "email": "jane.updated@example.com"
+}
+
+### Delete user (Admin only)
+DELETE {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{authToken}}
+
+### Request a payout (Seller only)
+POST {{baseUrl}}/users/payout
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "amount": 50000,
+  "description": "Monthly payout"
+}
+
+### Get pending payouts (Seller only)
+GET {{baseUrl}}/users/payouts/pending
+Authorization: Bearer {{authToken}}
+
+### Get user transactions
+GET {{baseUrl}}/users/transactions
+Authorization: Bearer {{authToken}}
+
+### Get user transactions with filters
+GET {{baseUrl}}/users/transactions?type=payout&status=pending
+Authorization: Bearer {{authToken}}
+
+### Change user password
+PATCH {{baseUrl}}/users/password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "oldPassword": "Password123!",
+  "newPassword": "NewPassword123!",
+  "confirmPassword": "NewPassword123!"
+}

@@ -1,0 +1,31 @@
+@baseUrl = http://localhost:3000/api/v1
+@token = your_admin_auth_token_here
+
+### Get products pending approval
+GET {{baseUrl}}/admin/products/pending?page=1&limit=10
+Authorization: Bearer {{token}}
+
+### Get disabled products
+GET {{baseUrl}}/admin/products/disabled?page=1&limit=10
+Authorization: Bearer {{token}}
+
+### Approve a product
+PATCH {{baseUrl}}/admin/products/64a1b2c3d4e5f67890123456/approve
+Authorization: Bearer {{token}}
+
+### Reject product approval
+PATCH {{baseUrl}}/admin/products/64a1b2c3d4e5f67890123456/reject
+Authorization: Bearer {{token}}
+
+### Disable a product
+PATCH {{baseUrl}}/admin/products/64a1b2c3d4e5f67890123456/disable
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "reason": "Product does not meet our quality standards"
+}
+
+### Enable a previously disabled product
+PATCH {{baseUrl}}/admin/products/64a1b2c3d4e5f67890123456/enable
+Authorization: Bearer {{token}}

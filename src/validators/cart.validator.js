@@ -1,0 +1,61 @@
+import Joi from "joi";
+import validate from "../middlewares/validate.js";
+import mongoose from "mongoose";
+
+// Schema for adding an item to cart
+export const addItemSchema = Joi.object({
+    productId: Joi.string()
+        .required()
+        .custom((value, helpers) => {
+            if (!mongoose.Types.ObjectId.isValid(value)) {
+                return helpers.error("string.objectId", { value });
+            }
+            return value;
+        })
+        .messages({
+            "string.empty": "Product ID is required",
+            "any.required": "Product ID is required",
+            "string.objectId": "Invalid product ID format",
+        }),
+    variantId: Joi.string()
+        .allow(null)
+        .custom((value, helpers) => {
+            if (value && !mongoose.Types.ObjectId.isValid(value)) {
+                return helpers.error("string.objectId", { value });
+            }
+            return value;
+        })
+        .messages({
+            "string.objectId": "Invalid variant ID format",
+        }),
+    quantity: Joi.number().integer().min(1).required().messages({
+        "number.base": "Quantity must be a number",
+        "number.integer": "Quantity must be an integer",
+        "number.min": "Quantity must be at least 1",
+        "any.required": "Quantity is required",
+    }),
+    carrierId: Joi.string().required().messages({
+        "string.base": "Carrier ID must be a string",
+        "string.empty": "Carrier ID is required",
+        "any.required": "Carrier ID is required",
+    }),
+    request_token: Joi.string().required().messages({
+        "string.base": "Request token must be a string",
+        "string.empty": "Request token is required",
+        "any.required": "Request token is required",
+    }),
+});
+
+// Schema for updating cart item quantity
+export const updateQuantitySchema = Joi.object({
+    quantity: Joi.number().integer().min(1).required().messages({
+        "number.base": "Quantity must be a number",
+        "number.integer": "Quantity must be an integer",
+        "number.min": "Quantity must be at least 1",
+        "any.required": "Quantity is required",
+    }),
+});
+
+// Create validation middleware functions
+export const validateAddItem = validate(addItemSchema);
+export const validateUpdateQuantity = validate(updateQuantitySchema);

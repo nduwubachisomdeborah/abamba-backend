@@ -1,0 +1,26 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NTIxYWQ0ZDkxMWI0NTYyNTU0ODM5YyIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzUxMzE5MDc3LCJleHAiOjE3ODI4NzY2Nzd9.31drnjQuMc5YrdWFg9y7-GOP9txusKqjKnG2wce5fYs
+@userId = user_id_here
+
+@fileId = 6863bcdcfaeb443bf6259159
+
+### Single file upload (any field name)
+PUT {{baseUrl}}/upload
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+Authorization: Bearer {{authToken}}
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="profile_picture"; filename="avatar.jpg"
+Content-Type: image/jpeg
+
+< C:\Users\Dev Bash\Documents\ND\logo.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Delete file
+DELETE {{baseUrl}}/upload/{{fileId}}
+Authorization: Bearer {{authToken}}
+
+### Get file
+GET {{baseUrl}}/upload/{{fileId}}
+Authorization: Bearer {{authToken}}

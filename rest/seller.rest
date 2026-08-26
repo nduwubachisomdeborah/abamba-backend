@@ -1,0 +1,301 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NjNjMzRmMDNiZDMxY2NlYzdiNTJiNiIsInJvbGUiOiJzZWxsZXIiLCJpYXQiOjE3NTEzNjkyOTIsImV4cCI6MTc4MjkyNjg5Mn0.SLncd9UZMNm35EK5bsJMryl-hiyfgah6hEM-VPYRk3E
+@userId = user_id_here
+
+@sellerId = 68521cf732c1e858d41139d8
+
+### Login seller
+POST {{baseUrl}}/seller/login
+Content-Type: application/json
+
+{
+  "email": "jane23@example.com",
+  "password": "Password123!"
+}
+
+### Seller signup
+POST {{baseUrl}}/seller/signup
+Content-Type: application/json
+
+{
+  "name": "Jane Smith",
+  "email": "jane23@example.com",
+  "phoneNumber": "+1587654321",
+  "password": "Password123!",
+  "dob": "01/01/2000",
+}
+
+### Seller forgot password
+POST {{baseUrl}}/seller/forgot-password
+Content-Type: application/json
+
+{
+  "email": "jane23@example.com"
+}
+
+### Seller reset password
+POST {{baseUrl}}/seller/reset-password
+Content-Type: application/json
+
+{
+  "email": "jane23@example.com",
+  "otpCode": "123456",
+  "newPassword": "NewPassword123!",
+  "confirmPassword": "NewPassword123!"
+}
+
+### Verify OTP
+POST {{baseUrl}}/seller/verify-otp
+Content-Type: application/json
+
+{
+  "email": "jane23@example.com",
+  "otpCode": "720355"
+}
+
+### Resend OTP
+POST {{baseUrl}}/seller/resend-otp
+Content-Type: application/json
+
+{
+  "email": "jane23@example.com"
+}
+
+### Seller onboarding
+POST {{baseUrl}}/seller/onboard
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+    "name": "Jane Adam",
+    "dob": "01/01/2000",
+    "phoneNumber": "+1987654321",
+    "address": {
+        "addressLine1": "123 Main St",
+        "city": "Anytown",
+        "state": "CA"
+    },
+    "bank": {
+        "bankName": "Bank of America",
+        "accountNumber": "1234567890",
+        "accountName": "Jane Smith",
+        "bankCode": "123456",
+        "bvn": "72345678971237"
+    },
+    "businessName": "Jane's Business",
+    "businessType": "Retail",
+    "businessAddress": {
+        "addressLine1": "123 Main St",
+        "city": "Anytown",
+        "state": "CA"
+    },
+    "businessPhone": "+1987654321",
+    "businessEmail": "jane@example.com",
+    "documentType": "nin",
+    "personalDocument": "6880114f0f0c503d4266cfe3",
+    "businessDocument": "6880114f0f0c503d4266cfe3"
+}
+
+### Get banks
+GET {{baseUrl}}/seller/bank/list
+
+### Resolve bank account
+GET {{baseUrl}}/seller/bank/resolve?accountNumber=0001234567&bankCode=058
+Authorization: Bearer {{authToken}}
+
+### Update seller bank details
+PATCH {{baseUrl}}/seller/bank
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "bank": {
+    "bankName": "Access Bank",
+    "accountNumber": "0123456789",
+    "accountName": "Jane Doe",
+    "bankCode": "044",
+    "bvn": "12345678901"
+  },
+  "otp": "123456"
+}
+
+
+### Get seller stats
+GET {{baseUrl}}/seller/stats
+Authorization: Bearer {{authToken}}
+
+### Get seller profile
+GET {{baseUrl}}/seller/me
+Authorization: Bearer {{authToken}}
+
+### Update seller profile picture
+PATCH {{baseUrl}}/seller/profile-picture
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "profilePicture": "https://cdn.example.com/images/profile.jpg"
+}
+
+### Update seller password
+PATCH {{baseUrl}}/seller/password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "oldPassword": "Password123!",
+  "newPassword": "NewPassword123!",
+  "confirmPassword": "NewPassword123!"
+}
+
+### Update seller notification settings
+PATCH {{baseUrl}}/seller/notification-settings
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "orderConfirmation": false,
+  "emailNotification": true,
+  "orderStatusChange": true,
+  "orderDelivered": true
+}
+
+### Get seller by ID (Public with optional authentication)
+# This endpoint returns seller information including store statistics
+# If authenticated, includes follow status and follow details
+GET {{baseUrl}}/seller/{{sellerId}}
+Content-Type: application/json
+
+### Get seller by ID (Authenticated - includes follow status)
+GET {{baseUrl}}/seller/{{sellerId}}
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+### Follow seller
+POST {{baseUrl}}/seller/{{sellerId}}/follow
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+### Unfollow seller
+DELETE {{baseUrl}}/seller/{{sellerId}}/follow
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+### Get seller followers (Public)
+GET {{baseUrl}}/seller/{{sellerId}}/followers?page=1&limit=20
+Content-Type: application/json
+
+### Get sellers I'm following (Private)
+GET {{baseUrl}}/seller/following?page=1&limit=20
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+# Follow seller response:
+# {
+#   "success": true,
+#   "message": "Successfully followed seller",
+#   "data": {
+#     "follow": {
+#       "id": "follow_id",
+#       "follower": "user_id",
+#       "following": "seller_id",
+#       "followedAt": "2024-01-15T10:30:00Z"
+#     },
+#     "message": "You are now following this seller"
+#   }
+# }
+#
+# Unfollow seller response:
+# {
+#   "success": true,
+#   "message": "Successfully unfollowed seller",
+#   "data": {
+#     "message": "You are no longer following this seller"
+#   }
+# }
+#
+# Followers list response:
+# {
+#   "success": true,
+#   "message": "Seller followers retrieved successfully",
+#   "data": {
+#     "followers": [
+#       {
+#         "id": "user_id",
+#         "name": "Follower Name",
+#         "profilePicture": "image_url",
+#         "followedAt": "2024-01-15T10:30:00Z"
+#       }
+#     ],
+#     "pagination": {
+#       "currentPage": 1,
+#       "totalPages": 5,
+#       "totalItems": 87,
+#       "hasNext": true,
+#       "hasPrev": false
+#     }
+#   }
+# }
+
+### Get seller by ID with store statistics
+GET {{baseUrl}}/seller/{{sellerId}}
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+# Returns seller information with comprehensive store statistics and follow info:
+# {
+#   "name": "Seller Name",
+#   "profilePicture": "https://example.com/profile.jpg",
+#   "followerCount": 1247,
+#   "followInfo": {
+#     "isFollowing": true,
+#     "followDetails": {
+#       "id": "follow_id",
+#       "followedAt": "2024-01-15T10:30:00Z"
+#     }
+#   },
+#   "storeStats": {
+#     "totalSales": 150000,
+#     "totalOrders": 245,
+#     "totalCustomers": 189,
+#     "totalProducts": 45,
+#     "averageRating": 4.3,
+#     "totalReviews": 87,
+#     "reviewPercentage": 35.5,
+#     "conversionRate": 12.8,
+#     "repeatCustomerRate": 23.3,
+#     "totalViews": 5420,
+#     "uniqueViewers": 1478,
+#     "averageOrderValue": 612.24,
+#     "topRatedProducts": [
+#     "averageOrderValue": 121.42,      // Average value per order
+#     "topRatedProducts": [             // Top 3 highest-rated products
+#       {
+#         "id": "product_id",
+#         "name": "Product Name",
+#         "rating": 4.8,
+#         "reviews": 45
+#       }
+#     ]
+#   }
+# }
+
+### ========== PAYOUT MANAGEMENT ==========
+
+### Request a payout
+POST {{baseUrl}}/seller/payout
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "amount": 50000,
+  "description": "Monthly payout request"
+}
+
+### Get all payouts
+GET {{baseUrl}}/seller/payouts
+Authorization: Bearer {{authToken}}
+
+### Get seller transactions
+GET {{baseUrl}}/seller/transactions
+Authorization: Bearer {{authToken}}

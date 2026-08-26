@@ -1,0 +1,98 @@
+@baseUrl = http://localhost:3000/api/v1
+@token = your_auth_token_here
+
+### Get all products with active promotions
+GET {{baseUrl}}/products?promoActive=true
+Authorization: Bearer {{token}}
+
+### Create new product with promotional pricing
+POST {{baseUrl}}/seller/products
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Premium Noise-Cancelling Headphones",
+  "description": "Experience crystal clear sound with our premium noise-cancelling headphones.",
+  "basePrice": 299.99,
+  "promoPrice": 199.99,
+  "onSale": true,
+  "saleStartDate": "2025-05-01T00:00:00.000Z",
+  "saleEndDate": "2025-06-30T23:59:59.999Z",
+  "category": "electronics",
+  "brand": "AudioTech",
+  "images": [
+    {
+      "url": "https://example.com/images/headphones-main.jpg",
+      "altText": "Premium noise-cancelling headphones"
+    }
+  ],
+  "featured": true,
+  "variants": [
+    {
+      "attributes": {
+        "color": "Black"
+      },
+      "price": 299.99,
+      "promoPrice": 199.99,
+      "quantity": 25,
+      "sku": "HDPHN-BLK"
+    },
+    {
+      "attributes": {
+        "color": "White"
+      },
+      "price": 299.99,
+      "promoPrice": 199.99,
+      "quantity": 15,
+      "sku": "HDPHN-WHT"
+    }
+  ]
+}
+
+### Update product to add time-limited promotion
+PUT {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "promoPrice": 249.99,
+  "onSale": true,
+  "saleStartDate": "2025-06-15T00:00:00.000Z",
+  "saleEndDate": "2025-06-30T23:59:59.999Z"
+}
+
+### Add promotion to existing product
+POST {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456/promotion
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "promoPrice": 179.99,
+  "saleStartDate": "2025-05-25T00:00:00.000Z",
+  "saleEndDate": "2025-06-10T23:59:59.999Z"
+}
+
+### Remove promotion from product
+DELETE {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456/promotion
+Authorization: Bearer {{token}}
+
+### Add promotion to a specific variant
+POST {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456/variants/65a1b2c3d4e5f67890123456/promotion
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "promoPrice": 279.99
+}
+
+### Remove promotion from a specific variant
+DELETE {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456/variants/65a1b2c3d4e5f67890123456/promotion
+Authorization: Bearer {{token}}
+
+### Admin: Approve product with promotional pricing
+PATCH {{baseUrl}}/admin/products/64a1b2c3d4e5f67890123456/approve
+Authorization: Bearer {{token}}
+
+### Run the promotion update script manually (in terminal)
+# Execute this in your terminal: 
+# node src/scripts/update-promotions.js

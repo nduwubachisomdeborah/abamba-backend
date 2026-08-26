@@ -1,0 +1,42 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4M2VkMWFjMTUxNjk5MjVkMTQ1OTdmNiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzQ4OTQ5MDE1LCJleHAiOjE3ODA1MDY2MTV9.L352-fxGfY7tfPTlLg_NDDI6z9c8L-x8WRvZkC7iO2o
+
+### Get User's Cart
+# Returns the current user's cart or creates a new one if none exists
+GET {{baseUrl}}/cart
+Authorization: Bearer {{authToken}}
+
+### Add Item to Cart
+# Add a product or variant to the cart
+POST {{baseUrl}}/cart
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "productId": "6838c815feecef3a6019b7d6",
+  "variantId": "6838c815feecef3a6019b7e6",
+  "quantity": 3,
+  "carrierId": "6838c815feecef3a6019b7e7",
+  "request_token": "6838c815feecef3a6019b7e8"
+}
+
+### Update Cart Item Quantity
+# Update the quantity of an item in the cart
+PATCH {{baseUrl}}/cart/items/6832a4b7f12345678912345e
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "quantity": 3
+}
+
+### Remove Item from Cart
+# Remove a specific item from the cart
+DELETE {{baseUrl}}/cart/items/6832a4b7f12345678912345e
+Authorization: Bearer {{authToken}}
+
+### Clear Cart
+# Remove all items from the cart
+DELETE {{baseUrl}}/cart
+Authorization: Bearer {{authToken}}

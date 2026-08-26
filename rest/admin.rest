@@ -1,0 +1,546 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4ZDM0ODgwZTExMjcxMGI2M2NlY2RmMSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1OTI1MjUwMSwiZXhwIjoxNzkwNzg4NTAxfQ.e6lwcvGEA1uyYVa-cN7qMtGLgP6ztt543aOG76dWV28
+@adminId = target_admin_id_here
+@userId = target_user_id_here
+@sellerId = 68c7990a79296caf29428559
+@productId = target_product_id_here
+
+### Admin Login
+POST {{baseUrl}}/admin/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "ChangeMe123!"
+}
+
+# Notes:
+# - Replace {{ADMIN_EMAIL}} and {{ADMIN_PASSWORD}} with your admin credentials.
+# - If no admin exists, set ADMIN_EMAIL and ADMIN_PASSWORD in your .env and restart the server
+#   to trigger the auto-seed script.
+
+### Get Current Admin Profile
+GET {{baseUrl}}/admin/profile
+Authorization: Bearer {{adminToken}}
+
+### Get Admin Permissions
+GET {{baseUrl}}/admin/permissions
+Authorization: Bearer {{adminToken}}
+
+### Get Admin Stats
+GET {{baseUrl}}/admin/stats
+Authorization: Bearer {{adminToken}}
+
+### Create Admin (with permissions)
+POST {{baseUrl}}/admin
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "New Admin",
+  "email": "new.admin@example.com",
+  "phoneNumber": "+12345678901",
+  "password": "StrongPass1!",
+  "pages": ["dashboard", "orders", "products"],
+  "full": false,
+  "active": true
+}
+
+### Update Admin (profile and/or permissions)
+PATCH {{baseUrl}}/admin/{{adminId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Updated Admin",
+  "pages": ["dashboard", "orders", "users"],
+  "full": true,
+  "active": false,
+  "password": "NewPass1!"
+}
+
+### Get All Users (paginated with search)
+GET {{baseUrl}}/admin/users?page=1&limit=10&search=
+Authorization: Bearer {{adminToken}}
+
+### Get All Admins (paginated with search)
+GET {{baseUrl}}/admin/admins
+Authorization: Bearer {{adminToken}}
+
+### Soft Delete an Admin
+DELETE {{baseUrl}}/admin/{{adminId}}
+Authorization: Bearer {{adminToken}}
+
+### Get All Sellers (paginated with search)
+GET {{baseUrl}}/admin/sellers?page=1&limit=10&search=
+Authorization: Bearer {{adminToken}}
+
+### Get Seller Info
+GET {{baseUrl}}/admin/sellers/{{sellerId}}/info
+Authorization: Bearer {{adminToken}}
+
+### Get Seller Orders
+GET {{baseUrl}}/admin/sellers/{{sellerId}}/orders?page=1&limit=10&search=pending&sortBy=total&sortOrder=asc
+Authorization: Bearer {{adminToken}}
+
+### Get Seller Reviews
+GET {{baseUrl}}/admin/sellers/{{sellerId}}/reviews?page=1&limit=10&search=product&sortBy=rating&sortOrder=desc
+Authorization: Bearer {{adminToken}}
+
+### Get Seller Payments
+GET {{baseUrl}}/admin/sellers/{{sellerId}}/payments?page=1&limit=10&search=txn&sortBy=payment.amount&sortOrder=desc
+Authorization: Bearer {{adminToken}}
+
+### Get All Products (paginated)
+GET {{baseUrl}}/admin/products?page=1&limit=10&search=shoe&status=approved&approved=true
+Authorization: Bearer {{adminToken}}
+
+### Get All Orders (paginated with custom sort: processing first)
+GET {{baseUrl}}/admin/orders?page=1&limit=10&status=
+Authorization: Bearer {{adminToken}}
+
+### Get Single Order
+@orderId = your_order_id_here
+GET {{baseUrl}}/admin/orders/{{orderId}}
+Authorization: Bearer {{adminToken}}
+
+### Update Seller Approval (approve)
+PATCH {{baseUrl}}/admin/sellers/{{sellerId}}/approval
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "approved": true
+}
+
+### Update Seller Approval (reject)
+PATCH {{baseUrl}}/admin/sellers/{{sellerId}}/approval
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "approved": false,
+  "message": "Missing key business verification documents"
+}
+
+### Approve a Product
+PATCH {{baseUrl}}/admin/products/{{productId}}/approve
+Authorization: Bearer {{adminToken}}
+
+### Reject a Product
+PATCH {{baseUrl}}/admin/products/{{productId}}/reject
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "message": "Product description contains disallowed claims"
+}
+
+### Suspend a User
+PATCH {{baseUrl}}/admin/users/{{userId}}/suspend
+Authorization: Bearer {{adminToken}}
+
+### Unsuspend a User
+PATCH {{baseUrl}}/admin/users/{{userId}}/unsuspend
+Authorization: Bearer {{adminToken}}
+
+### Soft Delete a User
+DELETE {{baseUrl}}/admin/users/{{userId}}
+Authorization: Bearer {{adminToken}}
+
+### Create Notification for User
+POST {{baseUrl}}/admin/notifications
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "System maintenance",
+  "description": "We will perform maintenance tonight at 10pm UTC.",
+  "user": "{{userId}}"
+}
+
+### Update Notification
+@notificationId = notification_id_here
+PATCH {{baseUrl}}/admin/notifications/{{notificationId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "System maintenance (updated)",
+  "read": true
+}
+
+### Get Platform Settings
+GET {{baseUrl}}/admin/settings/platform
+
+### Update Platform Settings (Full)
+PATCH {{baseUrl}}/admin/settings/platform
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "platformName": "Abamba",
+  "platformUrl": "http://abamba.com",
+  "adminEmail": "admin@abamba.com",
+  "supportEmail": "support@abamba.com",
+  "contactInfo": "+1 (555) 000-0000",
+  "timeZone": "UTC (Coordinated Universal Time)",
+  "logo": "https://example.com/logo.png",
+  "favicon": "https://example.com/favicon.png",
+  "socialMedia": {
+    "facebookUrl": "https://facebook.com/abamba",
+    "twitterUrl": "https://twitter.com/abamba",
+    "linkedinUrl": "https://linkedin.com/company/abamba",
+    "instagramUrl": "https://instagram.com/abamba"
+  },
+  "systemPreferences": {
+    "maintenanceMode": false,
+    "userRegistration": true,
+    "emailNotification": true,
+    "multiLanguageSupport": false
+  },
+  "security": {
+    "passwordPolicy": {
+      "minimumLength": 8,
+      "requireSpecialCharacters": true
+    },
+    "sessionTimeout": 30,
+    "twoFactorAuthentication": false
+  },
+  "termsOfUse": {
+    "title": "Terms of Use",
+    "content": "Complete terms of use content..."
+  },
+  "privacyPolicy": {
+    "title": "Privacy Policy",
+    "content": "Complete privacy policy content..."
+  }
+}
+
+### Update Platform Settings (Partial - Only Social Media)
+PATCH {{baseUrl}}/admin/settings/platform
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "socialMedia": {
+    "facebookUrl": "https://facebook.com/abamba"
+  }
+}
+
+### Update Platform Settings (Partial - Only System Preferences)
+PATCH {{baseUrl}}/admin/settings/platform
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "systemPreferences": {
+    "maintenanceMode": true
+  }
+}
+
+### Update Platform Settings (Partial - Only Security)
+PATCH {{baseUrl}}/admin/settings/platform
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "security": {
+    "sessionTimeout": 60,
+    "twoFactorAuthentication": true
+  }
+}
+
+### Update Platform Settings (Partial - Terms of Use)
+PATCH {{baseUrl}}/admin/settings/platform
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "termsOfUse": {
+    "title": "Terms of Use",
+    "content": "<h1>Terms of Use</h1><p>Welcome to our platform. By accessing and using this service, you accept and agree to be bound by the terms and provision of this agreement.</p><h2>1. Acceptance of Terms</h2><p>By using our services, you agree to these terms...</p>"
+  }
+}
+
+### Update Platform Settings (Partial - Privacy Policy)
+PATCH {{baseUrl}}/admin/settings/platform
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "privacyPolicy": {
+    "title": "Privacy Policy",
+    "content": "<h1>Privacy Policy</h1><p>This Privacy Policy describes how we collect, use, and share your personal information.</p><h2>1. Information We Collect</h2><p>We collect information you provide directly to us...</p>"
+  }
+}
+
+### Update Platform Settings (Partial - Contact Us Page)
+PATCH {{baseUrl}}/admin/settings/platform
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "contactUs": {
+    "heroSection": {
+      "title": "Contact Us",
+      "content": "Feel free to contact us and we will be happy to help you"
+    },
+    "storeLocation": {
+      "address": "369 Urban Boulevard, Holymark"
+    },
+    "contactCall": {
+      "phoneNumber1": "00876012343532",
+      "phoneNumber2": "00876012343532"
+    },
+    "contactEmail": {
+      "email1": "help@example.com",
+      "email2": "help@example.com"
+    }
+  }
+}
+
+### Update Platform Settings (Partial - Contact Us Hero Only)
+PATCH {{baseUrl}}/admin/settings/platform
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "contactUs": {
+    "heroSection": {
+      "title": "Get In Touch",
+      "content": "We're here to help! Reach out to us anytime."
+    }
+  }
+}
+
+### Update Platform Settings (Partial - Home Page Banners)
+PATCH {{baseUrl}}/admin/settings/platform
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "homePage": {
+    "banners": [
+      {
+        "link": "https://example.com/shop/smart-wearables",
+        "bannerUrl": "https://example.com/images/banner-smart-watch.jpg",
+        "order": 1,
+        "isActive": true
+      },
+      {
+        "link": "https://example.com/shop/fashion",
+        "bannerUrl": "https://example.com/images/banner-fashion.jpg",
+        "order": 2,
+        "isActive": true
+      }
+    ],
+    "featuredBanners": [
+      {
+        "link": "https://example.com/collections/new-arrivals",
+        "bannerUrl": "https://example.com/images/featured-banner-1.jpg",
+        "order": 1,
+        "isActive": true
+      }
+    ]
+  }
+}
+
+### Update Platform Settings (Partial - Only Main Banners)
+PATCH {{baseUrl}}/admin/settings/platform
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "homePage": {
+    "banners": [
+      {
+        "link": "https://example.com/sale",
+        "bannerUrl": "https://example.com/images/sale-banner.jpg",
+        "order": 1,
+        "isActive": true
+      }
+    ]
+  }
+}
+
+### ========== FAQ MANAGEMENT ==========
+
+### Get All FAQs (with pagination and filters)
+GET {{baseUrl}}/admin/faqs?page=1&limit=10&search=&category=&isPublished=true
+Authorization: Bearer {{adminToken}}
+
+### Get FAQ Categories
+GET {{baseUrl}}/admin/faqs/categories
+Authorization: Bearer {{adminToken}}
+
+### Get FAQ by ID
+@faqId = your_faq_id_here
+GET {{baseUrl}}/admin/faqs/{{faqId}}
+Authorization: Bearer {{adminToken}}
+
+### Create FAQ
+POST {{baseUrl}}/admin/faqs
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "question": "How do I reset my password?",
+  "answer": "To reset your password, click on the 'Forgot Password' link on the login page. Enter your email address and follow the instructions sent to your email.",
+  "category": "Account",
+  "order": 1,
+  "isPublished": true
+}
+
+### Update FAQ
+PATCH {{baseUrl}}/admin/faqs/{{faqId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "question": "How do I reset my password? (Updated)",
+  "answer": "To reset your password, click on the 'Forgot Password' link on the login page. Enter your registered email address and follow the instructions sent to your email.",
+  "category": "Account Management",
+  "order": 2,
+  "isPublished": true
+}
+
+### Update FAQ (Partial - Only Published Status)
+PATCH {{baseUrl}}/admin/faqs/{{faqId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "isPublished": false
+}
+
+### Delete FAQ (Soft Delete)
+DELETE {{baseUrl}}/admin/faqs/{{faqId}}
+Authorization: Bearer {{adminToken}}
+
+### ========== PAYOUT MANAGEMENT ==========
+
+### Get Payout Stats
+GET {{baseUrl}}/admin/payouts/stats
+Authorization: Bearer {{adminToken}}
+
+### Get All Pending Payouts
+GET {{baseUrl}}/admin/payouts
+Authorization: Bearer {{adminToken}}
+
+### Approve a Payout
+@payoutId = your_payout_id_here
+PATCH {{baseUrl}}/admin/payouts/{{payoutId}}/approve
+Authorization: Bearer {{adminToken}}
+
+### Reject a Payout
+PATCH {{baseUrl}}/admin/payouts/{{payoutId}}/reject
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "reason": "Insufficient account verification documents"
+}
+
+### ========== SHIPPING MANAGEMENT ==========
+
+### Get ShipBubble Couriers
+GET {{baseUrl}}/admin/shipping/couriers
+Authorization: Bearer {{adminToken}}
+
+### Toggle Courier Status
+@courierId = your_courier_id_here
+PATCH {{baseUrl}}/admin/shipping/couriers/{{courierId}}/toggle
+Authorization: Bearer {{adminToken}}
+
+### Get Shipping Rates for Order
+GET {{baseUrl}}/admin/orders/{{orderId}}/shipping-rates
+Authorization: Bearer {{adminToken}}
+
+### Create Shipment for Order
+POST {{baseUrl}}/admin/orders/{{orderId}}/shipment
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "request_token": "token_from_shipping_rates_response",
+  "service_code": "service_code_from_response",
+  "courier_id": "courier_id_from_response",
+  "courier_name": "Courier Name"
+}
+
+
+### ========== WEBHOOKS (for testing) ==========
+
+### Test ShipBubble Webhook (status changed)
+# Note: In production, this is called by ShipBubble directly
+POST {{baseUrl}}/webhooks/shipbubble
+Content-Type: application/json
+
+{
+  "event": "shipment.status.changed",
+  "order_id": "SB-6BAD4363F17C",
+  "status": "delivered",
+  "courier": {
+    "name": "Darum NG",
+    "email": "darum@darum.com",
+    "phone": "010000038198"
+  },
+  "package_status": [
+    {
+      "status": "Delivered",
+      "datetime": "2026-02-04T12:00:00.000Z"
+    }
+  ],
+  "tracking_url": "https://shipbubble.com/tracking/SB-6BAD4363F17C"
+}
+
+
+### ========== STORE LOCATION MANAGEMENT ==========
+
+### Get All Store Locations (Including Disabled)
+GET {{baseUrl}}/admin/store-locations
+Authorization: Bearer {{adminToken}}
+
+### Get Store Locations (Enabled Only)
+GET {{baseUrl}}/admin/store-locations?disabled=false
+Authorization: Bearer {{adminToken}}
+
+### Get Store Locations (Disabled Only)
+GET {{baseUrl}}/admin/store-locations?disabled=true
+Authorization: Bearer {{adminToken}}
+
+### Create Store Location
+POST {{baseUrl}}/admin/store-locations
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+    "name": "Main Downtown Store",
+    "address": "15 Babatunde Jose St, Victoria Island 106104, Lagos, Nigeria",
+    "latitude": 6.436058,
+    "longitude": 3.433361
+}
+
+### Get Store Location by ID
+@storeLocationId = target_store_location_id_here
+GET {{baseUrl}}/admin/store-locations/{{storeLocationId}}
+Authorization: Bearer {{adminToken}}
+
+### Update Store Location
+PATCH {{baseUrl}}/admin/store-locations/{{storeLocationId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+    "name": "Main Downtown Store (Moved)",
+    "address": "New Address Here, Lagos",
+    "latitude": 6.5,
+    "longitude": 3.5,
+    "disabled": true
+}
+
+### Delete Store Location (Soft Delete)
+DELETE {{baseUrl}}/admin/store-locations/{{storeLocationId}}
+Authorization: Bearer {{adminToken}}

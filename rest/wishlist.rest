@@ -1,0 +1,82 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@userAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NTIxYWQ0ZDkxMWI0NTYyNTU0ODM5YyIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzUwMjExMzY5LCJleHAiOjE3ODE3Njg5Njl9.gmBQQ1RGfn6XLsw6wCv7OLYwfP7VDpRZozpWzd8lmpA
+@sellerAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZCIsInJvbGUiOiJzZWxsZXIiLCJpYXQiOjE3NDgxMTQyNzAsImV4cCI6MTc1NTg5MDI3MH0.gXk8RYT5eXGV4Qn8UBUBd9NY2xUTjMBEjr0hLH95emU
+@adminAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZiIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc0ODExNDI3MCwiZXhwIjoxNzU1ODkwMjcwfQ.7euq-gEnkskFatDRPDYLjD9LK8MSoYWYd1EnCSPZJvF
+
+### Get All User's Wishlists
+# Retrieves all wishlists for the authenticated user
+GET {{baseUrl}}/wishlists
+Authorization: Bearer {{userAuthToken}}
+
+### Create New Wishlist
+# Create a new wishlist for the authenticated user
+POST {{baseUrl}}/wishlists
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "name": "Summer Shopping"
+}
+
+### Create Default Wishlist
+# Create the default wishlist (or get it if it already exists)
+POST {{baseUrl}}/wishlists
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "name": "Wishlist"
+}
+
+### Get Wishlist by ID
+# Get a specific wishlist by its ID
+GET {{baseUrl}}/wishlists/68521e9e4a7ab25569391620
+Authorization: Bearer {{userAuthToken}}
+
+### Update Wishlist
+# Update wishlist details
+PATCH {{baseUrl}}/wishlists/68521e9e4a7ab25569391620
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "name": "Summer Favorites"
+}
+
+### Add Product to Specific Wishlist
+# Add a product to a specific wishlist
+POST {{baseUrl}}/wishlists/68521e9e4a7ab25569391620/products
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "productId": "68521cf732c1e858d41139db",
+  "notes": "Want to get this on sale!"
+}
+
+### Add Product to Default Wishlist
+# Add a product directly to the default wishlist (no wishlist ID needed)
+POST {{baseUrl}}/wishlists/products
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "productId": "68521cf732c1e858d41139db",
+  "notes": "Perfect for the kitchen"
+}
+
+### Remove Product from Wishlist
+# Remove a product from the wishlist
+DELETE {{baseUrl}}/wishlists/6832a4b7f12345678912345a/products/6832a4b7f12345678912345b
+Authorization: Bearer {{userAuthToken}}
+
+### Delete Wishlist
+# Delete a wishlist (soft delete)
+DELETE {{baseUrl}}/wishlists/6832a4b7f12345678912345a
+Authorization: Bearer {{userAuthToken}}
+
+### Get Public Wishlist (Access Control Test)
+# Any user should be able to see public wishlists
+GET {{baseUrl}}/wishlists/6832a4b7f1234567891234cd
+Authorization: Bearer {{userAuthToken}}

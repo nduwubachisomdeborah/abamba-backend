@@ -1,0 +1,98 @@
+@baseUrl = http://localhost:3000/api/v1
+@token = your_seller_auth_token_here
+
+# ============================================================
+#  AI — Product Content Generation
+#  All routes require a valid seller JWT.
+# ============================================================
+
+### Generate product name from images (minimal)
+POST {{baseUrl}}/ai/generate-name
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "imageUrls": [
+    "https://example.com/images/product-front.jpg"
+  ]
+}
+
+###
+
+### Generate product name from images (with hints)
+POST {{baseUrl}}/ai/generate-name
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "imageUrls": [
+    "https://example.com/images/product-front.jpg",
+    "https://example.com/images/product-side.jpg"
+  ],
+  "category": "electronics",
+  "brand": "Sony"
+}
+
+###
+
+### Generate product name — override AI model
+POST {{baseUrl}}/ai/generate-name
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "imageUrls": [
+    "https://example.com/images/shoe-white.jpg"
+  ],
+  "category": "footwear",
+  "model": "google/gemini-pro-vision"
+}
+
+###
+
+### Generate product description from name + images (minimal)
+POST {{baseUrl}}/ai/generate-description
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "productName": "Wireless Noise-Cancelling Headphones",
+  "imageUrls": [
+    "https://example.com/images/headphones-front.jpg"
+  ]
+}
+
+###
+
+### Generate product description from name + images (with all hints)
+POST {{baseUrl}}/ai/generate-description
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "productName": "Premium Leather Backpack",
+  "imageUrls": [
+    "https://example.com/images/backpack-front.jpg",
+    "https://example.com/images/backpack-interior.jpg"
+  ],
+  "category": "bags",
+  "brand": "LeatherCraft",
+  "targetAudience": "young professionals and students"
+}
+
+###
+
+### Generate product description — override AI model
+POST {{baseUrl}}/ai/generate-description
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "productName": "Slim Fit Jogger Pants",
+  "imageUrls": [
+    "https://example.com/images/jogger-grey.jpg"
+  ],
+  "category": "clothing",
+  "targetAudience": "men aged 18-35",
+  "model": "google/gemini-pro-vision"
+}

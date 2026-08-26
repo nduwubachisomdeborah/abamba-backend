@@ -1,0 +1,85 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+
+# The full auth token is provided after OTP verification
+@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NTIxYWQ0ZDkxMWI0NTYyNTU0ODM5YyIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzUxMzE5MDc3LCJleHAiOjE3ODI4NzY2Nzd9.31drnjQuMc5YrdWFg9y7-GOP9txusKqjKnG2wce5fYs
+
+### Signup a new user
+# Step 1: Register - returns user details and OTP (no token yet)
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phoneNumber": "+1234567892",
+  "password": "Password123!"
+}
+
+### Create guest user
+POST {{baseUrl}}/auth/guest
+Content-Type: application/json
+
+### Login a user
+# Step 1 (Alternative): Login - returns user details and OTP (no token yet)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "password": "Password123!"
+}
+
+### Verify OTP
+# Step 2: Verify OTP - this is where you receive the authentication token
+# Provide email and OTP code (limited to 5 attempts)
+POST {{baseUrl}}/auth/verify-otp
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "otpCode": "168041"
+}
+
+### Resend OTP
+# Optional: Request a new OTP if the previous one expired
+# Use email to request a new OTP (no authentication required)
+POST {{baseUrl}}/auth/resend-otp
+Content-Type: application/json
+
+{
+  "email": "john@example.com"
+}
+
+### Sign in with Google
+# Authenticate using a Firebase/Google ID token
+# The token is obtained from the client-side Firebase Auth SDK
+POST {{baseUrl}}/auth/google
+Content-Type: application/json
+
+{
+  "idToken": "your_firebase_id_token_here"
+}
+
+### Forgot Password
+# Request a password reset OTP
+# The OTP will be sent to the provided email address
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "john@example.com"
+}
+
+### Reset Password
+# Reset password using email, OTP code, and new password
+# Limited to 5 verification attempts
+POST {{baseUrl}}/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "otpCode": "123456",
+  "newPassword": "NewPassword123!",
+  "confirmPassword": "NewPassword123!"
+}

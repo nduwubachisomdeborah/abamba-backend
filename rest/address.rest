@@ -1,0 +1,85 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@userAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NTIxYWQ0ZDkxMWI0NTYyNTU0ODM5YyIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzUxMzE5MDc3LCJleHAiOjE3ODI4NzY2Nzd9.31drnjQuMc5YrdWFg9y7-GOP9txusKqjKnG2wce5fYs
+@sellerAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZCIsInJvbGUiOiJzZWxsZXIiLCJpYXQiOjE3NDgxMTQyNzAsImV4cCI6MTc1NTg5MDI3MH0.gXk8RYT5eXGV4Qn8UBUBd9NY2xUTjMBEjr0hLH95emU
+
+### Get All User Addresses
+# Retrieves all addresses associated with the authenticated user
+GET {{baseUrl}}/users/addresses
+Authorization: Bearer {{userAuthToken}}
+
+### Get Address by ID
+# Retrieves a specific address by its ID
+GET {{baseUrl}}/users/addresses/6832a4b7f12345678912345h
+Authorization: Bearer {{userAuthToken}}
+
+### Add New Address
+# Add a new address to the user's address book
+POST {{baseUrl}}/users/addresses
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "fullName": "John Doe",
+  "addressLine1": "No 1 Eugene Oba street",
+  "addressLine2": "Apt 4B",
+  "city": "New York",
+  "state": "NY",
+  "zipCode": "10001",
+  "country": "USA",
+  "phoneNumber": "08054914518",
+  "isDefault": true,
+  "coordinates": {
+    "longitude": 7.483457659243914,
+    "latitude": 6.4216348975198825
+  }
+}
+
+### Add Secondary Address
+# Add another address to the user's address book (not default)
+POST {{baseUrl}}/users/addresses
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "fullName": "John Doe",
+  "addressLine1": "No 2 Eugene Oba street",
+  "addressLine2": "Suite 200",
+  "city": "San Francisco",
+  "state": "CA",
+  "zipCode": "94107",
+  "country": "USA",
+  "phoneNumber": "08054914518",
+  "isDefault": false,
+  "coordinates": {
+    "longitude": 7.483457659243914,
+    "latitude": 6.4216348975198825
+  }
+}
+
+### Update Address
+# Update an existing address
+PATCH {{baseUrl}}/users/addresses/68993225c352249e115985b5
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+  "addressLine1": "789 Updated Street",
+  "city": "Chicago",
+  "state": "IL",
+  "zipCode": "60601",
+  "coordinates": {
+    "longitude": 7.483457659243914,
+    "latitude": 6.4216348975198825
+  }
+}
+
+### Set Address as Default
+# Make an existing address the default shipping address
+PATCH {{baseUrl}}/users/addresses/6832a4b7f12345678912345i/default
+Authorization: Bearer {{userAuthToken}}
+
+### Delete Address
+# Remove an address from the user's address book
+DELETE {{baseUrl}}/users/addresses/6832a4b7f12345678912345h
+Authorization: Bearer {{userAuthToken}}

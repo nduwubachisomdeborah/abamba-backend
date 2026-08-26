@@ -1,0 +1,143 @@
+@baseUrl = http://localhost:3000/api/v1
+@token = your_auth_token_here
+
+### Get all seller products with pagination and filtering
+GET {{baseUrl}}/seller/products?page=1&limit=10
+Authorization: Bearer {{token}}
+
+### Get all products on sale
+GET {{baseUrl}}/seller/products?onSale=true&page=1&limit=10
+Authorization: Bearer {{token}}
+
+### Create new product
+POST {{baseUrl}}/seller/products
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Premium Leather Backpack",
+  "description": "Handcrafted leather backpack with multiple compartments and adjustable straps.",
+  "basePrice": 199.99,
+  "promoPrice": 159.99,
+  "category": "clothing",
+  "brand": "LeatherCraft",
+  "images": [
+    {
+      "url": "https://example.com/images/backpack1.jpg",
+      "altText": "Front view of leather backpack"
+    },
+    {
+      "url": "https://example.com/images/backpack2.jpg",
+      "altText": "Interior view of leather backpack"
+    }
+  ],
+  "featured": true,
+  "variants": [
+    {
+      "attributes": {
+        "color": "Brown",
+        "size": "Large"
+      },
+      "price": 199.99,
+      "promoPrice": 159.99,
+      "quantity": 15,
+      "sku": "LB-BRN-L"
+    },
+    {
+      "attributes": {
+        "color": "Black",
+        "size": "Large"
+      },
+      "price": 199.99,
+      "promoPrice": 159.99,
+      "quantity": 10,
+      "sku": "LB-BLK-L"
+    }
+  ]
+}
+
+### Update product
+PUT {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Premium Leather Backpack Deluxe",
+  "description": "Handcrafted leather backpack with multiple compartments, adjustable straps, and water-resistant coating.",
+  "basePrice": 219.99,
+  "promoPrice": 179.99,
+  "featured": true
+}
+
+### Delete product
+DELETE {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456
+Authorization: Bearer {{token}}
+
+### Set product promotion
+POST {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456/promotion
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "promoPrice": 149.99,
+  "saleStartDate": "2025-06-01T00:00:00.000Z",
+  "saleEndDate": "2025-06-30T23:59:59.999Z"
+}
+
+### Remove product promotion
+DELETE {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456/promotion
+Authorization: Bearer {{token}}
+
+### Add variant to product
+POST {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456/variants
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "attributes": {
+    "color": "Tan",
+    "size": "Medium"
+  },
+  "price": 189.99,
+  "promoPrice": 149.99,
+  "quantity": 8,
+  "sku": "LB-TAN-M",
+  "images": [
+    {
+      "url": "https://example.com/images/backpack-tan-m.jpg",
+      "altText": "Tan medium backpack"
+    }
+  ]
+}
+
+### Update variant
+PUT {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456/variants/65a1b2c3d4e5f67890123456
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "price": 189.99,
+  "promoPrice": 139.99,
+  "quantity": 12
+}
+
+### Delete variant
+DELETE {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456/variants/65a1b2c3d4e5f67890123456
+Authorization: Bearer {{token}}
+
+### Set variant promotion
+POST {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456/variants/65a1b2c3d4e5f67890123456/promotion
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "promoPrice": 129.99
+}
+
+### Remove variant promotion
+DELETE {{baseUrl}}/seller/products/64a1b2c3d4e5f67890123456/variants/65a1b2c3d4e5f67890123456/promotion
+Authorization: Bearer {{token}}
+
+### Get seller product statistics
+GET {{baseUrl}}/seller/products/stats
+Authorization: Bearer {{token}}

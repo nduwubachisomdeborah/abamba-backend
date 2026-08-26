@@ -1,0 +1,114 @@
+### Variables
+@baseUrl = http://localhost:3000/api/v1
+@userAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NTIxYWQ0ZDkxMWI0NTYyNTU0ODM5YyIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzUxMzE5MDc3LCJleHAiOjE3ODI4NzY2Nzd9.31drnjQuMc5YrdWFg9y7-GOP9txusKqjKnG2wce5fYs
+@sellerAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZCIsInJvbGUiOiJzZWxsZXIiLCJpYXQiOjE3NDgxMTQyNzAsImV4cCI6MTc1NTg5MDI3MH0.gXk8RYT5eXGV4Qn8UBUBd9NY2xUTjMBEjr0hLH95emU
+@adminAuthToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzIxYjVkNDEzNTBiNTgxMWJiNGJjZiIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc0ODExNDI3MCwiZXhwIjoxNzU1ODkwMjcwfQ.7euq-gEnkskFatDRPDYLjD9LK8MSoYWYd1EnCSPZJvF
+
+### Track Shipment by Tracking Number (Public)
+# This endpoint is public and doesn't require authentication
+GET {{baseUrl}}/shipments/tracking/ABC123456789
+Content-Type: application/json
+
+### Get carriers for a product
+# This endpoint is protected and requires authentication
+POST {{baseUrl}}/shipments/carriers
+Content-Type: application/json
+Authorization: Bearer {{userAuthToken}}
+
+{
+    "productId": "689ccd3238b1a2405ee00130",
+    "shippingAddressId": "68993225c352249e115985b5",
+    "variantId": null,
+    "quantity": 1
+}
+
+### Get All Shipments (User)
+# Regular users can only see shipments for their orders
+GET {{baseUrl}}/shipments
+Authorization: Bearer {{userAuthToken}}
+
+### Get All Shipments (Seller)
+# Sellers can see shipments containing their products
+GET {{baseUrl}}/shipments
+Authorization: Bearer {{sellerAuthToken}}
+
+### Get All Shipments with Filtering (Seller)
+# Sellers can also use filtering options
+GET {{baseUrl}}/shipments?page=1&limit=10&status=in_transit&carrier=fedex&startDate=2025-01-01&endDate=2025-12-31&sort=-createdAt
+Authorization: Bearer {{sellerAuthToken}}
+
+### Get All Shipments with Filtering (Admin)
+# Admins can see all shipments with filtering options
+GET {{baseUrl}}/shipments?page=1&limit=10&status=in_transit&carrier=fedex&startDate=2025-01-01&endDate=2025-12-31&sort=-createdAt
+Authorization: Bearer {{adminAuthToken}}
+
+### Get Shipment by ID (User)
+# Get details of a specific shipment as a customer
+GET {{baseUrl}}/shipments/6832a4b7f12345678912345g
+Authorization: Bearer {{userAuthToken}}
+
+### Get Shipment by ID (Seller)
+# Get details of a specific shipment as a seller
+# Only works if the shipment contains orders with products sold by this seller
+GET {{baseUrl}}/shipments/6832a4b7f12345678912345g
+Authorization: Bearer {{sellerAuthToken}}
+
+### Get Shipment by ID (Admin)
+# Get details of a specific shipment as an admin
+GET {{baseUrl}}/shipments/6832a4b7f12345678912345g
+Authorization: Bearer {{adminAuthToken}}
+
+### Create a New Shipment (Admin only)
+# Create a shipment for one or more orders
+POST {{baseUrl}}/shipments
+Content-Type: application/json
+Authorization: Bearer {{adminAuthToken}}
+
+{
+  "orderIds": ["123456", "123457"],
+  "carrier": "fedex",
+  "trackingNumber": "FEDEX12345678901",
+  "trackingUrl": "https://www.fedex.com/track?tracknum=FEDEX12345678901",
+  "shippingMethod": "express",
+  "estimatedDelivery": "2025-06-05T00:00:00.000Z",
+  "shippingCost": 15.00,
+  "packageWeight": 2.5,
+  "packageDimensions": {
+    "length": 12,
+    "width": 8,
+    "height": 4,
+    "unit": "in"
+  },
+  "notes": "Fragile items, handle with care"
+}
+
+### Add Tracking Update (Admin only)
+# Add a new tracking update to a shipment
+POST {{baseUrl}}/shipments/6832a4b7f12345678912345g/tracking
+Content-Type: application/json
+Authorization: Bearer {{adminAuthToken}}
+
+{
+  "status": "in_transit",
+  "location": "New York, NY",
+  "description": "Package in transit to next facility"
+}
+
+### Update Shipment Details (Admin only)
+# Update basic shipment information
+PATCH {{baseUrl}}/shipments/6832a4b7f12345678912345g
+Content-Type: application/json
+Authorization: Bearer {{adminAuthToken}}
+
+{
+  "carrier": "ups",
+  "trackingNumber": "UPS12345678901",
+  "trackingUrl": "https://www.ups.com/track?tracknum=UPS12345678901",
+  "estimatedDelivery": "2025-06-04T00:00:00.000Z",
+  "notes": "Updated shipping information"
+}
+
+### Delete Shipment (Admin only - soft delete)
+# Soft delete a shipment
+DELETE {{baseUrl}}/shipments/6832a4b7f12345678912345g
+Authorization: Bearer {{adminAuthToken}}

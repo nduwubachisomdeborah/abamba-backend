@@ -1,0 +1,159 @@
+name: CI/CD Pipeline
+
+on:
+    push:
+        branches: [deploy]
+    pull_request:
+        branches: [deploy]
+        types: [closed]
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        if: (github.ref == 'refs/heads/deploy' && github.event_name == 'push') || (github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'deploy')
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Deploy to server with Auto-Rollback
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                  host: ${{ secrets.SERVER_HOST }}
+                  username: ${{ secrets.SERVER_USER }}
+                  password: ${{ secrets.SERVER_PASSWORD }}
+                  port: ${{ secrets.SERVER_PORT || 22 }}
+                  script: |
+                      set -e
+                      echo "🚀 Starting deployment..."
+
+                      # === SETUP VARIABLES ===
+                      PROJECT_DIR="/opt/abamba-api"
+                      BACKUP_DIR="/opt/abamba-api-backup"
+                      export TOKEN="${{ secrets.TOKEN }}"
+                      export GITHUB_REPOSITORY="${{ github.repository }}"
+                      REPO_URL="https://${TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+                      # === CONFIGURE GIT ===
+                      git config --global user.name "GitHub Action"
+                      git config --global user.email "action@github.com"
+                      git config --global credential.helper store
+                      echo "https://${TOKEN}:x-oauth-basic@github.com" > ~/.git-credentials
+                      chmod 600 ~/.git-credentials
+
+                      sudo mkdir -p $PROJECT_DIR
+                      sudo chown -R $USER:$USER $PROJECT_DIR
+                      git config --global --add safe.directory $PROJECT_DIR
+
+                      # === BACKUP CURRENT STATE (for rollback) ===
+                      if [ -d "$PROJECT_DIR" ] && [ -d "$PROJECT_DIR/.git" ]; then
+                        echo "📦 Backing up current version..."
+                        sudo rm -rf "$BACKUP_DIR"
+                        sudo cp -a "$PROJECT_DIR" "$BACKUP_DIR"
+                      fi
+
+                      cd $PROJECT_DIR
+
+                      # === CLONE OR UPDATE REPOSITORY ===
+                      if [ -d ".git" ]; then
+                        echo "Repository exists, updating..."
+                        git remote remove origin || true
+                        git remote add origin $REPO_URL
+                        git fetch origin deploy
+                        git reset --hard origin/deploy
+                        git clean -fd
+                      else
+                        echo "Cloning repository..."
+                        git clone -b deploy $REPO_URL .
+                      fi
+
+                      # === COPY ENVIRONMENT FILES ===
+                      if [ -d "/opt/env/abamba-api" ]; then
+                        echo "Copying environment files from /opt/env/abamba-api"
+                        sudo cp -a "/opt/env/abamba-api"/. "$PROJECT_DIR"/
+                        if [ -f "/opt/env/abamba-api/.env" ]; then
+                          sudo cp -f "/opt/env/abamba-api/.env" "$PROJECT_DIR/.env"
+                        fi
+                        sudo chown -R $USER:$USER "$PROJECT_DIR"
+                        if [ -f "$PROJECT_DIR/.env" ]; then
+                          chmod 600 "$PROJECT_DIR/.env"
+                          echo ".env file copied successfully."
+                        else
+                          echo "⚠️  Warning: .env not found after copy."
+                        fi
+                      fi
+
+                      # === OVERRIDE .env FROM SECRET ===
+                      if [ -n "${{ secrets.ENV_FILE }}" ]; then
+                        echo "Writing .env from ENV_FILE secret"
+                        echo "${{ secrets.ENV_FILE }}" > .env
+                        chmod 600 .env
+                      fi
+
+                      # === WRITE FIREBASE SERVICE ACCOUNT ===
+                      FIREBASE_SECRET='${{ secrets.FIREBASE }}'
+                      if [ -n "$FIREBASE_SECRET" ]; then
+                        echo "Creating firebase-service-account.json from FIREBASE secret"
+                        cat > firebase-service-account.json << 'EOF'
+                      ${{ secrets.FIREBASE }}
+                      EOF
+                        chmod 600 firebase-service-account.json
+                        echo "✅ firebase-service-account.json created successfully"
+                      else
+                        echo "⚠️  Warning: FIREBASE secret is empty; skipping firebase-service-account.json creation."
+                      fi
+
+                      # === STOP EXISTING CONTAINERS ===
+                      if command -v docker-compose &> /dev/null; then
+                        docker-compose down || true
+                      else
+                        docker compose down || true
+                      fi
+
+                      # === CLEAN OLD IMAGES ===
+                      docker image prune -f
+
+                      # === BUILD AND START CONTAINERS ===
+                      mkdir -p "$PROJECT_DIR/src/logs"
+                      sudo chown -R 1001:1001 "$PROJECT_DIR/src/logs" || true
+                      sudo chmod -R 775 "$PROJECT_DIR/src/logs" || true
+
+                      echo "🛠️ Building and starting new containers..."
+                      if command -v docker-compose &> /dev/null; then
+                        docker-compose --env-file .env up -d --build
+                      else
+                        docker compose --env-file .env up -d --build
+                      fi
+
+                      echo "⏳ Waiting for services to be ready..."
+                      sleep 30
+
+                      # === VERIFY DEPLOYMENT ===
+                      echo "🔍 Checking API health..."
+                      if curl -f http://localhost:5500/ > /dev/null 2>&1; then
+                        echo "✅ Deployment successful! API is running."
+                        docker image prune -f
+                        echo "🎉 Deployment completed successfully."
+                      else
+                        echo "❌ Deployment failed! API not responding. Rolling back..."
+                        # === ROLLBACK PROCESS ===
+                        if [ -d "$BACKUP_DIR" ]; then
+                          echo "🔁 Restoring from backup..."
+                          sudo rm -rf "$PROJECT_DIR"
+                          sudo cp -a "$BACKUP_DIR" "$PROJECT_DIR"
+                          cd "$PROJECT_DIR"
+                          if command -v docker-compose &> /dev/null; then
+                            docker-compose --env-file .env up -d --build
+                          else
+                            docker compose --env-file .env up -d --build
+                          fi
+                          sleep 20
+                          if curl -f http://localhost:5500/ > /dev/null 2>&1; then
+                            echo "✅ Rollback successful! API is back online with previous version."
+                          else
+                            echo "❌ Rollback failed! Manual intervention required."
+                          fi
+                        else
+                          echo "⚠️ No backup found to rollback to."
+                        fi
+                        exit 1
+                      fi
