@@ -1,7 +1,12 @@
 import Plunk from '@plunk/node';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import * as Handlebars from 'handlebars';
 import { EMAIL_FAILED } from '../config/strings.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class EmailService {
     constructor() {
@@ -17,7 +22,11 @@ class EmailService {
     async sendEmail(to, subject, template, data) {
         try {
             // Read and compile template
-            const templateContent = readFileSync(`src/templates/${template}.hbs`, 'utf8');
+            let templatePath = path.resolve(__dirname, '../templates', `${template}.hbs`);
+            if (!existsSync(templatePath)) {
+                templatePath = path.resolve(process.cwd(), 'src/templates', `${template}.hbs`);
+            }
+            const templateContent = readFileSync(templatePath, 'utf8');
 
             const html = Handlebars.compile(templateContent)({
                 ...data,
