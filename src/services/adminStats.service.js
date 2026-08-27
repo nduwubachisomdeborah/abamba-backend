@@ -149,6 +149,108 @@ class AdminStatsService {
       { $sort: { count: -1 } },
     ]);
 
+    // Regional performance metrics for Imo and Abia states
+    const [
+      imoBuyersCount,
+      abiaBuyersCount,
+      imoSellersCount,
+      abiaSellersCount,
+      regionalOrdersAgg,
+    ] = await Promise.all([
+      User.countDocuments({
+        deleted: { $ne: true },
+        role: { $in: ["user", "customer"] },
+        "addresses.state": { $regex: /imo/i },
+      }),
+      User.countDocuments({
+        deleted: { $ne: true },
+        role: { $in: ["user", "customer"] },
+        "addresses.state": { $regex: /abia/i },
+      }),
+      User.countDocuments({
+        deleted: { $ne: true },
+        role: "seller",
+        $or: [
+          { "business.businessAddress.state": { $regex: /imo/i } },
+          { "addresses.state": { $regex: /imo/i } },
+        ],
+      }),
+      User.countDocuments({
+        deleted: { $ne: true },
+        role: "seller",
+        $or: [
+          { "business.businessAddress.state": { $regex: /abia/i } },
+          { "addresses.state": { $regex: /abia/i } },
+        ],
+      }),
+      Order.aggregate([
+        {
+          $match: {
+            deleted: { $ne: true },
+            "payment.status": { $in: ["completed", "paid"] },
+            "shippingAddress.state": { $regex: /^(imo|abia)$/i },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              $cond: [
+                { $regexMatch: { input: "$shippingAddress.state", regex: /imo/i } },
+                "Imo",
+                "Abia",
+              ],
+            },
+            ordersCount: { $sum: 1 },
+            revenue: { $sum: { $ifNull: ["$payment.amount", "$total"] } },
+          },
+        },
+      ]),
+    ]);
+
+    const orderStatsByState = regionalOrdersAgg.reduce((acc, curr) => {
+      acc[curr._id] = {
+        ordersCount: curr.ordersCount || 0,
+        revenue: curr.revenue || 0,
+      };
+      return acc;
+    }, {});
+
+    const imoOrders = orderStatsByState["Imo"] || { ordersCount: 0, revenue: 0 };
+    const abiaOrders = orderStatsByState["Abia"] || { ordersCount: 0, revenue: 0 };
+
+    const totalPaidOrders = ordersPaidCount > 0 
+      ? ordersPaidCount 
+      : (imoOrders.ordersCount + abiaOrders.ordersCount);
+
+    const regionalPerformance = [
+      {
+        state: "Imo",
+        hub: "Owerri Hub",
+        coordinates: { lat: 5.4891, lng: 7.0176 },
+        buyersCount: imoBuyersCount,
+        sellersCount: imoSellersCount,
+        totalUsers: imoBuyersCount + imoSellersCount,
+        ordersCount: imoOrders.ordersCount,
+        revenue: imoOrders.revenue,
+        percentage: totalPaidOrders > 0 
+          ? Math.round((imoOrders.ordersCount / totalPaidOrders) * 100) 
+          : 0,
+      },
+      {
+        state: "Abia",
+        hub: "Aba / Umuahia Hub",
+        coordinates: { lat: 5.1065, lng: 7.3667 },
+        buyersCount: abiaBuyersCount,
+        sellersCount: abiaSellersCount,
+        totalUsers: abiaBuyersCount + abiaSellersCount,
+        ordersCount: abiaOrders.ordersCount,
+        revenue: abiaOrders.revenue,
+        percentage: totalPaidOrders > 0 
+          ? Math.round((abiaOrders.ordersCount / totalPaidOrders) * 100) 
+          : 0,
+      },
+    ];
+
     return {
       paymentsAmount,
       ordersPaidCount,
@@ -158,7 +260,12 @@ class AdminStatsService {
       chartData,
       salesData,
       stateDistribution,
+      regionalPerformance,
     };
+  }
+
+  async getAdminStats() {
+    return this.getStats();
   }
 }
 

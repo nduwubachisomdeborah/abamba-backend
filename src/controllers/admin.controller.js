@@ -61,6 +61,8 @@ class AdminController {
         return successResponse(res, "Admin statistics retrieved", stats);
     });
 
+    static getAdminStats = AdminController.getStats;
+
     static getAllUsers = asyncHandler(async (req, res) => {
         const { page = 1, limit = 10, search = "" } = req.query;
         const data = await adminService.getAllUsers(
