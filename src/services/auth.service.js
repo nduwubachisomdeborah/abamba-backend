@@ -23,17 +23,19 @@ class AuthService {
             throw new AppError("User with this email already exists", 400);
         }
 
-        // Check if user with this phone number already exists
-        const existingPhone = await User.findOne({
-            phoneNumber: userData.phoneNumber,
-            role,
-        });
+        // Check if user with this phone number already exists (only if phoneNumber is provided)
+        if (userData.phoneNumber) {
+            const existingPhone = await User.findOne({
+                phoneNumber: userData.phoneNumber,
+                role,
+            });
 
-        if (existingPhone) {
-            throw new AppError(
-                "User with this phone number already exists",
-                400
-            );
+            if (existingPhone) {
+                throw new AppError(
+                    "User with this phone number already exists",
+                    400
+                );
+            }
         }
 
         // Generate OTP for verification
@@ -489,17 +491,19 @@ class AuthService {
             throw new AppError("User with this email already exists", 400);
         }
 
-        // Check if user with this phone number already exists
-        const existingPhone = await User.findOne({
-            phoneNumber,
-            role,
-        });
+        // Check if user with this phone number already exists (only if phoneNumber is provided)
+        if (phoneNumber) {
+            const existingPhone = await User.findOne({
+                phoneNumber,
+                role,
+            });
 
-        if (existingPhone) {
-            throw new AppError(
-                "User with this phone number already exists",
-                400
-            );
+            if (existingPhone) {
+                throw new AppError(
+                    "User with this phone number already exists",
+                    400
+                );
+            }
         }
 
         const user = await User.findOne({ _id: id, isGuest: true });
