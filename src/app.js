@@ -18,6 +18,7 @@ import v2Routes from "./routes/v2/index.js";
 import { initializeCategoryOptions } from "./scripts/initializeCategoryOptions.js";
 import { initializeAdminUser } from "./scripts/initializeAdmin.js";
 import { syncCouriers } from "./scripts/syncCouriers.js";
+import { seedLogisticsCompanies } from "./scripts/seedLogistics.js";
 
 // Import error middleware
 import { errorHandler } from "./middlewares/error.js";
@@ -111,6 +112,8 @@ mongoose
         initializeAdminUser();
         // Sync couriers from ShipBubble
         syncCouriers();
+        // Seed Regional Logistics Companies
+        seedLogisticsCompanies();
     })
     .catch((err) => console.error("Could not connect to MongoDB", err));
 

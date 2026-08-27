@@ -19,6 +19,7 @@ import storeLocationRoutes from "./storeLocation.routes.js";
 import notificationRoutes from "./notification.routes.js";
 import webhookRoutes from "./webhook.routes.js";
 import aiRoutes from "./ai.routes.js";
+import logisticsRoutes from "./logistics.routes.js";
 
 const router = Router();
 
@@ -43,6 +44,7 @@ router.use("/store-locations", storeLocationRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/webhooks", webhookRoutes);
 router.use("/ai", aiRoutes);
+router.use("/logistics", logisticsRoutes);
 
 // Health check route
 router.get("/health", (req, res) => {

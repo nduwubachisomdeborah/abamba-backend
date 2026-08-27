@@ -28,6 +28,12 @@ import {
     validateCreateStoreLocation,
     validateUpdateStoreLocation,
 } from "../../validators/admin.storeLocation.validator.js";
+import {
+    getAllCompanies,
+    toggleCompanyStatus,
+    markMonthlyPayoutSettled,
+    updateCompany,
+} from "../../controllers/logistics.controller.js";
 
 const router = Router();
 
@@ -293,6 +299,32 @@ router.delete(
     authenticate,
     adminOnly,
     AdminController.deleteStoreLocation,
+);
+
+// Regional Logistics management routes
+router.get(
+    "/regional-logistics",
+    authenticate,
+    adminOnly,
+    getAllCompanies,
+);
+router.patch(
+    "/regional-logistics/:id/toggle",
+    authenticate,
+    adminOnly,
+    toggleCompanyStatus,
+);
+router.post(
+    "/regional-logistics/:id/settle",
+    authenticate,
+    adminOnly,
+    markMonthlyPayoutSettled,
+);
+router.patch(
+    "/regional-logistics/:id",
+    authenticate,
+    adminOnly,
+    updateCompany,
 );
 
 export default router;

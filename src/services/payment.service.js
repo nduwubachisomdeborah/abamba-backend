@@ -9,6 +9,8 @@ import funzService from "./payments/funz.service.js";
 import { AppError } from "../middlewares/error.js";
 import User from "../models/user.model.js";
 import notificationService from "./notification.service.js";
+import LogisticsCompany from "../models/logisticsCompany.model.js";
+import emailService from "./email.service.js";
 
 class PaymentService {
     /**
@@ -206,6 +208,37 @@ class PaymentService {
         );
         const holderTotal = holderSubtotal + shippingCost;
 
+        // Check for assigned logistics company
+        let assignedCompany = null;
+        if (
+            orderData.logisticsCompanyId ||
+            orderData.companyId ||
+            orderData.logisticsCompany
+        ) {
+            const companyId =
+                orderData.logisticsCompanyId ||
+                orderData.companyId ||
+                orderData.logisticsCompany;
+            if (mongoose.Types.ObjectId.isValid(companyId)) {
+                assignedCompany = await LogisticsCompany.findById(companyId);
+            } else if (typeof companyId === "string") {
+                assignedCompany = await LogisticsCompany.findOne({
+                    code: companyId.toLowerCase(),
+                });
+            }
+        }
+        if (!assignedCompany && finalShippingAddress?.state) {
+            const state = finalShippingAddress.state
+                .toLowerCase()
+                .includes("abia")
+                ? "Abia"
+                : "Imo";
+            assignedCompany = await LogisticsCompany.findOne({
+                state,
+                active: true,
+            });
+        }
+
         // Create orders first
         const platformFeePercentage =
             parseFloat(process.env.PLATFORM_FEE_PERCENTAGE) || 0.5;
@@ -230,6 +263,18 @@ class PaymentService {
                 items: items.map(({ seller, ...rest }) => rest),
                 shippingAddress: finalShippingAddress,
                 addressId: addressId || null,
+                logisticsDispatch: assignedCompany
+                    ? {
+                          company: assignedCompany._id,
+                          companyName: assignedCompany.name,
+                          companyEmail: assignedCompany.email,
+                          deliveryFee:
+                              orderShipping ||
+                              assignedCompany.defaultBasePrice ||
+                              3000,
+                          status: "notified",
+                      }
+                    : undefined,
                 payment: {
                     method: paymentMethod,
                     amount: total,
@@ -394,6 +439,65 @@ class PaymentService {
                 order.status === "pending" ? "processing" : order.status;
             order.payment.status = "completed";
             await order.save();
+        }
+
+        // Trigger logistics dispatch notifications and update company monthly ledger
+        for (const order of orders) {
+            try {
+                let company = null;
+                if (order.logisticsDispatch?.company) {
+                    company = await LogisticsCompany.findById(
+                        order.logisticsDispatch.company
+                    );
+                } else if (order.shippingAddress?.state) {
+                    const state = order.shippingAddress.state
+                        .toLowerCase()
+                        .includes("abia")
+                        ? "Abia"
+                        : "Imo";
+                    company = await LogisticsCompany.findOne({
+                        state,
+                        active: true,
+                    });
+                }
+
+                if (company) {
+                    const fee = Number(
+                        order.logisticsDispatch?.deliveryFee ||
+                            order.shippingCost ||
+                            company.defaultBasePrice ||
+                            3000
+                    );
+
+                    // Update company ledger
+                    await LogisticsCompany.findByIdAndUpdate(company._id, {
+                        $inc: {
+                            completedDeliveries: 1,
+                            totalEarned: fee,
+                            pendingPayout: fee,
+                        },
+                    });
+
+                    // Send dispatch email to company
+                    await emailService.sendLogisticsDispatchEmail(order, company);
+
+                    // Update order logisticsDispatch timestamp
+                    order.logisticsDispatch = {
+                        company: company._id,
+                        companyName: company.name,
+                        companyEmail: company.email,
+                        deliveryFee: fee,
+                        notifiedAt: new Date(),
+                        status: "notified",
+                    };
+                    await order.save();
+                }
+            } catch (dispatchErr) {
+                console.error(
+                    "Error processing logistics dispatch on order payment:",
+                    dispatchErr
+                );
+            }
         }
 
         // Credit seller wallets (subtotal only) and notify them

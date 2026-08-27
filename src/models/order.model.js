@@ -201,6 +201,22 @@ const orderSchema = new mongoose.Schema(
             ref: "Shipment",
             default: null,
         },
+        logisticsDispatch: {
+            company: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "LogisticsCompany",
+                default: null,
+            },
+            companyName: { type: String, default: null },
+            companyEmail: { type: String, default: null },
+            deliveryFee: { type: Number, default: 0 },
+            notifiedAt: { type: Date, default: null },
+            status: {
+                type: String,
+                enum: ["notified", "acknowledged", "picked_up", "delivered"],
+                default: "notified",
+            },
+        },
         deleted: {
             type: Boolean,
             default: false,
