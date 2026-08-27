@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
     getCheckoutLogistics,
     getAllCompanies,
+    getShippingStats,
     toggleCompanyStatus,
     markMonthlyPayoutSettled,
     updateCompany,
@@ -13,6 +14,7 @@ const router = Router();
 // Public Checkout & Query Routes
 router.get("/checkout-options", getCheckoutLogistics);
 router.get("/companies", getAllCompanies);
+router.get("/stats", getShippingStats);
 
 // Admin Logistics Management Routes
 router.get("/", authenticate, adminOnly, getAllCompanies);

@@ -30,6 +30,7 @@ import {
 } from "../../validators/admin.storeLocation.validator.js";
 import {
     getAllCompanies,
+    getShippingStats,
     toggleCompanyStatus,
     markMonthlyPayoutSettled,
     updateCompany,
@@ -307,6 +308,18 @@ router.get(
     authenticate,
     adminOnly,
     getAllCompanies,
+);
+router.get(
+    "/regional-logistics/stats",
+    authenticate,
+    adminOnly,
+    getShippingStats,
+);
+router.get(
+    "/shipping/stats",
+    authenticate,
+    adminOnly,
+    getShippingStats,
 );
 router.patch(
     "/regional-logistics/:id/toggle",
