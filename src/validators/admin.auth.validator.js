@@ -8,7 +8,7 @@ export const adminSignupSchema = Joi.object({
   password: Joi.string()
     .required()
     .min(8)
-    .pattern(new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])")),
+    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/),
 });
 
 // Admin login schema

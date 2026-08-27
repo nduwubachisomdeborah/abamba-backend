@@ -48,9 +48,7 @@ export const createAdminSchema = Joi.object({
         .pattern(/^\+?[0-9]{10,15}$/),
     password: Joi.string()
         .min(8)
-        .pattern(
-            new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])")
-        )
+        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/)
         .required(),
     pages: Joi.array().items(Joi.string().trim().min(1)).optional().default([]),
     full: Joi.boolean().optional().default(false),
@@ -66,9 +64,7 @@ export const updateAdminSchema = Joi.object({
         .pattern(/^\+?[0-9]{10,15}$/),
     password: Joi.string()
         .min(8)
-        .pattern(
-            new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])")
-        )
+        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/)
         .optional(),
     pages: Joi.array().items(Joi.string().trim().min(1)).optional(),
     full: Joi.boolean().optional(),
