@@ -220,13 +220,39 @@ class AdminService {
             return sellerObj;
         });
 
-        const totalSellers = await User.countDocuments(query);
+        const [totalSellers, activeSellers, pendingApprovals, suspendedSellers] =
+            await Promise.all([
+                User.countDocuments(query),
+                User.countDocuments({
+                    ...query,
+                    "business.approved": true,
+                    suspended: { $ne: true },
+                }),
+                User.countDocuments({
+                    ...query,
+                    "business.approved": false,
+                }),
+                User.countDocuments({
+                    ...query,
+                    suspended: true,
+                }),
+            ]);
 
         return {
             sellers: sellersWithTotals,
             totalPages: Math.ceil(totalSellers / limit),
             currentPage: page,
             totalSellers,
+            total: totalSellers,
+            activeSellers,
+            pendingApprovals,
+            suspendedSellers,
+            stats: {
+                totalSellers,
+                activeSellers,
+                pendingApprovals,
+                suspendedSellers,
+            },
         };
     }
 
