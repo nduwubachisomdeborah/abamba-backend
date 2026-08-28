@@ -160,7 +160,13 @@ class AdminService {
 
     async getAllSellers(page = 1, limit = 10, search = "") {
         const skip = (page - 1) * limit;
-        const query = { role: "seller", deleted: { $ne: true } };
+        const query = {
+            $or: [
+                { role: "seller" },
+                { "business.businessName": { $exists: true, $ne: "" } },
+            ],
+            deleted: { $ne: true },
+        };
 
         if (search) {
             query.$or = [

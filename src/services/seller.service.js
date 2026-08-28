@@ -508,6 +508,7 @@ class SellerService {
         }
 
         const user = {
+            role: "seller",
             name: data.name,
             phoneNumber: data.phoneNumber,
             dob: data.dob,
