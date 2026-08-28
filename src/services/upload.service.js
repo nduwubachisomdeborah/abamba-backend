@@ -55,7 +55,13 @@ class UploadService {
         }
 
         const publicId = this.getPublicIdFromUrl(file.url);
-        await cloudinary.uploader.destroy(publicId);
+        if (publicId && cloudinary?.uploader?.destroy) {
+            try {
+                await cloudinary.uploader.destroy(publicId);
+            } catch (err) {
+                console.error("Cloudinary delete error:", err.message);
+            }
+        }
         return await File.findByIdAndDelete(fileId);
     };
 }

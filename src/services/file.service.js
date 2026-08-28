@@ -4,10 +4,10 @@ class FileService {
     async addFiles(userId, files) {
         const filesResult = await File.create(
             files.map((file) => ({
-                name: file.originalname,
-                url: file.location || file.path,
-                mimeType: file.mimetype,
-                size: file.size,
+                name: file.originalname || file.filename || "file",
+                url: file.path || file.secure_url || file.location || file.url,
+                mimeType: file.mimetype || "application/octet-stream",
+                size: file.size || 0,
                 uploadedBy: userId,
             }))
         );

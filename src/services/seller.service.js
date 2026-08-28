@@ -493,19 +493,18 @@ class SellerService {
             throw new AppError("Business already approved", 400);
         }
 
-        const hasFiles = Promise.all([
-            fileService.hasFile(data.personalDocument),
-            fileService.hasFile(data.businessDocument),
-        ]);
-
-        const [personalDocument, businessDocument] = await hasFiles;
-
-        if (!personalDocument) {
-            throw new AppError("Personal document not found", 404);
+        if (data.personalDocument) {
+            const personalDocument = await fileService.hasFile(data.personalDocument);
+            if (!personalDocument) {
+                throw new AppError("Personal document not found", 404);
+            }
         }
 
-        if (!businessDocument && data.businessDocument) {
-            throw new AppError("Business document not found", 404);
+        if (data.businessDocument) {
+            const businessDocument = await fileService.hasFile(data.businessDocument);
+            if (!businessDocument) {
+                throw new AppError("Business document not found", 404);
+            }
         }
 
         const user = {

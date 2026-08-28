@@ -1,63 +1,27 @@
 import multer from "multer";
-import multerS3 from "multer-s3";
-import { S3Client } from "@aws-sdk/client-s3";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { genUnique } from "../utils/index.js";
 
-// Configure S3 client to talk to MinIO
-const useSSL = String(process.env.MINIO_USE_SSL).toLowerCase() === "true";
-const endpointHost = process.env.MINIO_ENDPOINT;
-const endpointPort = process.env.MINIO_PORT
-    ? parseInt(process.env.MINIO_PORT, 10)
-    : useSSL
-    ? 443
-    : 9000;
-const endpoint = `${
-    useSSL ? "https" : "http"
-}://${endpointHost}:${endpointPort}`;
+// Ensure Cloudinary is configured from environment variables
+cloudinary.config();
 
-const s3 = new S3Client({
-    forcePathStyle: true,
-    region: process.env.AWS_REGION || "us-east-1",
-    endpoint,
-    credentials: {
-        accessKeyId: process.env.MINIO_ACCESS_KEY,
-        secretAccessKey: process.env.MINIO_SECRET_KEY,
-    },
-});
+// Set up Cloudinary storage for multer
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: async (req, file) => {
+        const folder = "Abamba";
+        const id = genUnique();
+        const originalNameWithoutExt = (file.originalname || "file")
+            .replace(/\.[^/.]+$/, "")
+            .replace(/[^a-zA-Z0-9_-]/g, "_");
+        const public_id = `${id}_${originalNameWithoutExt}`;
 
-const BUCKET = process.env.MINIO_BUCKET_NAME;
-
-// Set up MinIO (S3-compatible) storage for multer
-const storage = multerS3({
-    s3,
-    bucket: BUCKET,
-    acl: "public-read",
-    contentType: multerS3.AUTO_CONTENT_TYPE,
-    metadata: (req, file, cb) => {
-        const { name } = req.user || {};
-        cb(null, {
-            filename: file.originalname,
-            uploader: name || "unknown",
-            metadata: JSON.stringify(req.body?.metadata || {}),
-        });
-    },
-    key: (req, file, cb) => {
-        try {
-            const folder = "Abamba";
-            let extension = "";
-            const match = file.originalname.match(/\.([^.]+)$/);
-            if (match) extension = `.${match[1]}`;
-
-            const id = genUnique();
-            const originalNameWithoutExt = file.originalname.replace(
-                /\.[^/.]+$/,
-                ""
-            );
-            const key = `${folder}/${id}_${originalNameWithoutExt}${extension}`;
-            cb(null, key);
-        } catch (err) {
-            cb(err);
-        }
+        return {
+            folder: folder,
+            public_id: public_id,
+            resource_type: "auto",
+        };
     },
 });
 
@@ -100,9 +64,11 @@ const supportedMimeTypes = [
     "application/pdf", // PDF document
     "application/rtf", // Rich Text Format
     "application/txt", // Text file
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
 
-// Set up multer with MinIO storage
+// Set up multer with Cloudinary storage
 const upload = multer({
     storage: storage,
     limits: { fileSize: 30_000_000 }, // Limit file size to 30MB

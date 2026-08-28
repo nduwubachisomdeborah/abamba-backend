@@ -41,9 +41,7 @@ export const sellerOnBoardingSchema = Joi.object({
     businessAddress: addressSchema.required(),
     businessPhone: Joi.string().required(),
     businessEmail: Joi.string().email().required(),
-    documentType: Joi.string()
-        .valid("nin", "nationalId", "driverLicense", "other")
-        .optional(),
+    documentType: Joi.string().optional(),
     personalDocument: ObjectIdSchema.optional(),
     businessDocument: ObjectIdSchema.optional(),
     storeLocation: ObjectIdSchema.required(),
