@@ -108,7 +108,6 @@ const businessSchema = new mongoose.Schema({
     },
     documentType: {
         type: String,
-        enum: ["nin", "nationalId", "driverLicense", "other"],
         required: [true, "Please provide your document type"],
         trim: true,
     },

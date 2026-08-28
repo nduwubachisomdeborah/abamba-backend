@@ -171,7 +171,9 @@ class AdminService {
         }
 
         const sellers = await User.find(query)
-            .populate("business")
+            .populate("business.personalDocument")
+            .populate("business.businessDocument")
+            .populate("business.storeLocation")
             .skip(skip)
             .limit(limit)
             .sort({ createdAt: -1 });
