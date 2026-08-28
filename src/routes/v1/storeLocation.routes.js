@@ -4,9 +4,6 @@ import { authenticate, restrictTo } from "../../middlewares/auth.js";
 
 const router = express.Router();
 
-// Protected routes - require authentication for CRUD operations
-router.use(authenticate);
-
 // Public routes - no authentication required for fetching store locations
 router.get("/", StoreLocationController.getEnabledStoreLocations);
 router.get(
@@ -14,6 +11,9 @@ router.get(
     StoreLocationController.getStoreLocationByAddressCode
 );
 router.get("/:id", StoreLocationController.getStoreLocationById);
+
+// Protected routes - require authentication and admin role for CRUD operations
+router.use(authenticate);
 
 router.post(
     "/",
