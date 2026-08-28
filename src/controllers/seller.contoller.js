@@ -138,9 +138,10 @@ class SellerController {
      * @access  Private
      */
     static getBanks = asyncHandler(async (req, res) => {
-        const banks = await paystackService.getBankList();
+        const result = await paystackService.getBankList();
+        const banks = result?.data || result || [];
 
-        return successResponse(res, "Banks retrieved successfully", banks.data);
+        return successResponse(res, "Banks retrieved successfully", banks);
     });
 
     /**

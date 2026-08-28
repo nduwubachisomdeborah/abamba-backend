@@ -94,7 +94,7 @@ class PaystackService {
         const response = await this.api.get(
             `/bank?country=${(codes[country] || country).toLowerCase()}`,
         );
-        return response;
+        return response.data;
     }
 
     async initiateTransfer({ amount, recipient, reason, reference }) {
