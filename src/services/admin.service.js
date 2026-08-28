@@ -355,8 +355,11 @@ class AdminService {
     async getSellerInfo(sellerId) {
         const seller = await User.findById(sellerId)
             .select("+business +bank")
+            .populate("business.personalDocument")
+            .populate("business.businessDocument")
+            .populate("business.storeLocation")
             .lean();
-        if (!seller || seller.role !== "seller") {
+        if (!seller) {
             throw new AppError("Seller not found", 404);
         }
         return seller;
