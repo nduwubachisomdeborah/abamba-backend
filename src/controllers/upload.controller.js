@@ -17,11 +17,12 @@ class UploadController {
             return successResponse(res, "No file uploaded", []);
         }
 
-        const files = req.file ? [req.file] : req.files;
+        const files = req.file ? [req.file] : (req.files || []);
 
         try {
-            const filesResult = await fileService.addFiles(req.user._id, files);
-            successResponse(
+            const userId = req.user?._id || req.user?.id || null;
+            const filesResult = await fileService.addFiles(userId, files);
+            return successResponse(
                 res,
                 "Upload success",
                 filesResult.map((file) => {
@@ -35,8 +36,8 @@ class UploadController {
                 })
             );
         } catch (error) {
-            console.error("error", error);
-            errorResponse(res, error.message || "An error occurred");
+            console.error("Upload error:", error);
+            return errorResponse(res, error.message || "An error occurred");
         }
     }
 

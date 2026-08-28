@@ -26,8 +26,9 @@ const storage = new CloudinaryStorage({
 });
 
 const supportedMimeTypes = [
-    // Image MIME types
+    // Image MIME types (including iOS formats)
     "image/jpeg",
+    "image/jpg",
     "image/png",
     "image/gif",
     "image/bmp",
@@ -36,6 +37,13 @@ const supportedMimeTypes = [
     "image/svg+xml",
     "image/x-icon",
     "image/vnd.microsoft.icon",
+    "image/heic",
+    "image/heif",
+    "image/heic-sequence",
+    "image/heif-sequence",
+    "image/pjpeg",
+    "image/x-png",
+    "image/jfif",
 
     // Audio MIME types
     "audio/mpeg", // MP3
@@ -66,6 +74,9 @@ const supportedMimeTypes = [
     "application/txt", // Text file
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/octet-stream",
 ];
 
 // Set up multer with Cloudinary storage
@@ -73,7 +84,8 @@ const upload = multer({
     storage: storage,
     limits: { fileSize: 30_000_000 }, // Limit file size to 30MB
     fileFilter: (req, file, cb) => {
-        if (supportedMimeTypes.includes(file.mimetype)) {
+        // Accept if mimetype is in supported list or starts with image/
+        if (file.mimetype.startsWith("image/") || supportedMimeTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
             cb(new Error("Unsupported file type: " + file.originalname), false);
