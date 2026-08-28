@@ -509,6 +509,8 @@ class SellerService {
 
         const user = {
             role: "seller",
+            deleted: false,
+            deletedAt: null,
             name: data.name,
             phoneNumber: data.phoneNumber,
             dob: data.dob,
