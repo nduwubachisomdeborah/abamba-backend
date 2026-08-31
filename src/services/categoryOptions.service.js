@@ -632,6 +632,11 @@ class CategoryOptionsService {
 
             // Ensure any custom or legacy category in database is also marked approved
             await CategoryOption.updateMany({}, { $set: { approved: true } });
+
+            // Clean up dummy products in categories that have active real seller products
+            import("./product.service.js")
+                .then((mod) => mod.default.cleanupDummyProductsForLiveCategories())
+                .catch(() => {});
         } catch (error) {
             console.error("Failed to seed/sync category options:", error);
         }

@@ -197,6 +197,7 @@ const createProductFromAPI = (apiProduct, sellerId) => {
             : [],
         variants,
         hasVariants: variants.length > 0,
+        isDummy: true,
         user: sellerId,
         approved: true,
         approvedAt: new Date(),

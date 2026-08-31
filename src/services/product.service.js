@@ -1,6 +1,7 @@
 import Product from "../models/product.model.js";
 import CategoryOption from "../models/categoryOptions.model.js";
 import Review from "../models/review.model.js";
+import User from "../models/user.model.js";
 import { AppError } from "../middlewares/error.js";
 import PaginationUtil from "../utils/pagination.util.js";
 import reviewService from "./review.service.js";
@@ -9,10 +10,117 @@ import ProductViewed from "../models/productviewed.model.js";
 
 class ProductService {
     /**
-     * Extract unique variant attributes from a product
-     * @param {Object} product - Product document
-     * @returns {Object} Object with attribute names as keys and arrays of unique values as values
+     * Helper to exclude dummy products from categories that have active products from real sellers
+     * @param {Object} baseFilter - Initial query filter
+     * @returns {Promise<Object>} Modified filter excluding dummy products where real seller products exist
      */
+    async _buildCategoryDummyFilter(baseFilter = {}) {
+        try {
+            // Find dummy users / seed sellers
+            const dummyUsers = await User.find({
+                $or: [
+                    { email: { $in: ["seller@example.com", "zek.tech24@gmail.com"] } },
+                    { name: "Default Seller" },
+                ],
+            }).select("_id");
+            const dummyUserIds = dummyUsers.map((u) => u._id);
+
+            // Find categories that have at least one approved, active, real (non-dummy) seller product
+            const realProductQuery = {
+                deleted: false,
+                approved: true,
+                disabled: false,
+                $and: [{ isDummy: { $ne: true } }],
+            };
+            if (dummyUserIds.length > 0) {
+                realProductQuery.$and.push({ user: { $nin: dummyUserIds } });
+            }
+
+            const categoriesWithRealProducts = await Product.distinct(
+                "category",
+                realProductQuery
+            );
+
+            const validRealCategories = categoriesWithRealProducts.filter(Boolean);
+
+            if (validRealCategories.length > 0) {
+                const dummyConditions = [{ isDummy: true }];
+                if (dummyUserIds.length > 0) {
+                    dummyConditions.push({ user: { $in: dummyUserIds } });
+                }
+
+                // If a product belongs to a category that has real products, it CANNOT be a dummy product
+                const dummyExclusion = {
+                    $nor: [
+                        {
+                            category: { $in: validRealCategories },
+                            $or: dummyConditions,
+                        },
+                    ],
+                };
+
+                return {
+                    ...baseFilter,
+                    $and: [...(baseFilter.$and || []), dummyExclusion],
+                };
+            }
+
+            return baseFilter;
+        } catch (error) {
+            console.error("Error building dummy product filter:", error);
+            return baseFilter;
+        }
+    }
+
+    /**
+     * Clean up or soft-delete dummy products in categories that have active real seller products
+     */
+    async cleanupDummyProductsForLiveCategories() {
+        try {
+            const dummyUsers = await User.find({
+                $or: [
+                    { email: { $in: ["seller@example.com", "zek.tech24@gmail.com"] } },
+                    { name: "Default Seller" },
+                ],
+            }).select("_id");
+            const dummyUserIds = dummyUsers.map((u) => u._id);
+
+            const realProductQuery = {
+                deleted: false,
+                approved: true,
+                disabled: false,
+                $and: [{ isDummy: { $ne: true } }],
+            };
+            if (dummyUserIds.length > 0) {
+                realProductQuery.$and.push({ user: { $nin: dummyUserIds } });
+            }
+
+            const categoriesWithRealProducts = await Product.distinct(
+                "category",
+                realProductQuery
+            );
+            const validRealCategories = categoriesWithRealProducts.filter(Boolean);
+
+            if (validRealCategories.length > 0) {
+                const dummyConditions = [{ isDummy: true }];
+                if (dummyUserIds.length > 0) {
+                    dummyConditions.push({ user: { $in: dummyUserIds } });
+                }
+
+                // Delete dummy products in categories that now have real products
+                await Product.deleteMany({
+                    category: { $in: validRealCategories },
+                    $or: dummyConditions,
+                });
+            }
+        } catch (error) {
+            console.error(
+                "Error cleaning up dummy products for live categories:",
+                error
+            );
+        }
+    }
+
     /**
      * Convert variant attributes Map to regular objects for all variants in a product
      * @param {Object} product - Product with variants to process
@@ -260,11 +368,14 @@ class ProductService {
             sort = { createdAt: -1 };
         }
 
+        // Exclude dummy products in categories that have real seller products
+        const finalFilter = await this._buildCategoryDummyFilter(filter);
+
         // Count total matching documents
-        const total = await Product.countDocuments(filter);
+        const total = await Product.countDocuments(finalFilter);
 
         // Get products with pagination, filtering, and sorting
-        const products = await Product.find(filter)
+        const products = await Product.find(finalFilter)
             .sort(sort)
             .skip(skip)
             .limit(limit)
@@ -417,8 +528,14 @@ class ProductService {
         }
 
         const newProduct = new Product(productToCreate);
+        const savedProduct = await newProduct.save();
 
-        return await newProduct.save();
+        // Clean up dummy products for live categories asynchronously
+        this.cleanupDummyProductsForLiveCategories().catch((err) =>
+            console.error("Cleanup dummy products error:", err)
+        );
+
+        return savedProduct;
     }
 
     /**
@@ -491,7 +608,15 @@ class ProductService {
      * @returns {Promise<Array>} Array of featured products
      */
     async getFeaturedProducts(limit = 5, includeRatingStats = false) {
-        const products = await Product.find({ featured: true, deleted: false })
+        const baseFilter = {
+            featured: true,
+            deleted: false,
+            approved: true,
+            disabled: false,
+        };
+        const finalFilter = await this._buildCategoryDummyFilter(baseFilter);
+
+        const products = await Product.find(finalFilter)
             .sort({ rating: -1 })
             .limit(limit)
             .populate({
@@ -1024,9 +1149,17 @@ class ProductService {
      */
     async getBrandsAndCategories(filters = {}) {
         try {
-            const baseQuery = { deleted: false };
-            const brandQuery = { ...baseQuery };
-            const categoryQuery = { ...baseQuery };
+            // Also trigger background cleanup for live categories
+            this.cleanupDummyProductsForLiveCategories().catch(() => {});
+
+            const baseQuery = {
+                deleted: false,
+                approved: true,
+                disabled: false,
+            };
+            const filteredBase = await this._buildCategoryDummyFilter(baseQuery);
+            const brandQuery = { ...filteredBase };
+            const categoryQuery = { ...filteredBase };
 
             // Apply category filter to brand query if provided
             if (filters.category) {

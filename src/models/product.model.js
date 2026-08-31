@@ -198,6 +198,10 @@ const productSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        isDummy: {
+            type: Boolean,
+            default: false,
+        },
         lowStockAlert: {
             type: Number,
             default: null,
