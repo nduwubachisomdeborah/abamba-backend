@@ -270,7 +270,7 @@ class ProductService {
             .limit(limit)
             .populate({
                 path: "user",
-                select: "name email",
+                select: "name email +business",
             });
 
         // Generate pagination metadata
@@ -284,6 +284,12 @@ class ProductService {
                 // Add unique variant attributes
                 productObj.variantAttributes =
                     this._extractUniqueVariantAttributes(product);
+
+                // Add seller business name fallback
+                productObj.sellerName =
+                    product.user?.business?.businessName ||
+                    product.user?.name ||
+                    "Vendor";
 
                 return productObj;
             });
@@ -331,7 +337,7 @@ class ProductService {
         })
             .populate({
                 path: "user",
-                select: "name email",
+                select: "name email +business",
             })
             .select(
                 options?.isAdmin
@@ -352,6 +358,12 @@ class ProductService {
         // Add unique variant attributes
         productObj.variantAttributes =
             this._extractUniqueVariantAttributes(product);
+
+        // Add seller business name fallback
+        productObj.sellerName =
+            product.user?.business?.businessName ||
+            product.user?.name ||
+            "Vendor";
 
         // Include detailed rating statistics if requested
         if (includeRatingStats) {
@@ -484,7 +496,7 @@ class ProductService {
             .limit(limit)
             .populate({
                 path: "user",
-                select: "name email",
+                select: "name email +business",
             });
 
         // Process products to include additional data
@@ -495,6 +507,12 @@ class ProductService {
                 // Add unique variant attributes
                 productObj.variantAttributes =
                     this._extractUniqueVariantAttributes(product);
+
+                // Add seller business name fallback
+                productObj.sellerName =
+                    product.user?.business?.businessName ||
+                    product.user?.name ||
+                    "Vendor";
 
                 return productObj;
             });
