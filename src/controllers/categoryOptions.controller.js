@@ -64,6 +64,32 @@ class CategoryOptionsController {
             `Options for ${category} updated successfully`,
             updatedOptions
         );
+    /**
+     * @desc    Create a new category option (seller / user / admin)
+     * @route   POST /api/v1/products/category-options
+     * @access  Public / Authenticated
+     */
+    static createCategoryOption = asyncHandler(async (req, res) => {
+        const { category, options } = req.body;
+
+        if (!category || typeof category !== "string" || !category.trim()) {
+            return errorResponse(res, "Category name is required", 400);
+        }
+
+        const userId = req.user?._id || req.user?.id || null;
+        const newCategoryOption =
+            await categoryOptionsService.createCategoryOption(
+                category,
+                options || [],
+                userId
+            );
+
+        return successResponse(
+            res,
+            "Category created successfully",
+            newCategoryOption,
+            201
+        );
     });
 }
 

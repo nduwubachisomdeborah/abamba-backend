@@ -33,6 +33,11 @@ router.get(
     "/category-options",
     CategoryOptionsController.getAllCategoryOptions
 );
+router.post(
+    "/category-options",
+    optionalAuth(authenticate),
+    CategoryOptionsController.createCategoryOption
+);
 router.get(
     "/category-options/:category",
     CategoryOptionsController.getCategoryOptionsByCategory
