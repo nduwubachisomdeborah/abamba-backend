@@ -1,4 +1,5 @@
 import Product from "../models/product.model.js";
+import CategoryOption from "../models/categoryOptions.model.js";
 import Review from "../models/review.model.js";
 import { AppError } from "../middlewares/error.js";
 import PaginationUtil from "../utils/pagination.util.js";
@@ -376,10 +377,25 @@ class ProductService {
      * @returns {Promise<Object>} New product object
      */
     async createProduct(productData, userId) {
+        const normalizedCat = (productData.category || "other").trim().toLowerCase();
+
+        // Ensure category is registered in CategoryOption
+        const categoryExists = await CategoryOption.findOne({
+            category: normalizedCat,
+        });
+        if (!categoryExists) {
+            await CategoryOption.create({
+                category: normalizedCat,
+                options: [],
+                approved: true,
+                user: userId,
+            });
+        }
+
         // Add user ID to product data
         const productToCreate = {
             ...productData,
-            category: productData.category.toLowerCase(),
+            category: normalizedCat,
             user: userId,
         };
 

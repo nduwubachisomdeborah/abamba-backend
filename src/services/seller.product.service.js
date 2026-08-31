@@ -79,17 +79,23 @@ class SellerProductService {
         // Set the user field to the seller ID
         productData.user = sellerId;
 
-        // Validate that the category exists in CategoryOption
+        // Ensure category is trimmed, lowercased, and registered in CategoryOption
         if (productData.category) {
+            const normalizedCat = productData.category.trim().toLowerCase();
+            productData.category = normalizedCat;
+
+            // Ensure category exists in CategoryOption or auto-register it
             const categoryExists = await CategoryOption.findOne({
-                category: productData.category?.toLowerCase(),
+                category: normalizedCat,
             });
 
             if (!categoryExists) {
-                throw new AppError(
-                    `Category '${productData.category}' is not a valid category. Please check available categories.`,
-                    400
-                );
+                await CategoryOption.create({
+                    category: normalizedCat,
+                    options: [],
+                    approved: true,
+                    user: sellerId,
+                });
             }
         }
 
@@ -166,17 +172,22 @@ class SellerProductService {
             );
         }
 
-        // Validate that the category exists in CategoryOption (if category is being updated)
+        // Ensure category is trimmed, lowercased, and registered in CategoryOption (if category is being updated)
         if (updateData.category) {
+            const normalizedCat = updateData.category.trim().toLowerCase();
+            updateData.category = normalizedCat;
+
             const categoryExists = await CategoryOption.findOne({
-                category: updateData.category,
+                category: normalizedCat,
             });
 
             if (!categoryExists) {
-                throw new AppError(
-                    `Category '${updateData.category}' is not a valid category. Please check available categories.`,
-                    400
-                );
+                await CategoryOption.create({
+                    category: normalizedCat,
+                    options: [],
+                    approved: true,
+                    user: sellerId,
+                });
             }
         }
 
