@@ -64,6 +64,8 @@ class CategoryOptionsController {
             `Options for ${category} updated successfully`,
             updatedOptions
         );
+    });
+
     /**
      * @desc    Create a new category option (seller / user / admin)
      * @route   POST /api/v1/products/category-options
