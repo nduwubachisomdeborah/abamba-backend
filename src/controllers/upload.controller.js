@@ -42,18 +42,20 @@ class UploadController {
     }
 
     deleteFile = asyncHandler(async (req, res) => {
+        const userId = req.user?._id || req.user?.id || null;
         const file = await uploadService.deleteFile(
             req.params.id,
-            req.user._id
+            userId
         );
         successResponse(res, "File deleted successfully", file);
     });
 
     getFile = asyncHandler(async (req, res) => {
-        const isAdmin = req.user.role === "admin";
+        const isAdmin = req.user?.role === "admin";
+        const userId = req.user?._id || req.user?.id || null;
         const file = isAdmin
             ? await fileService.getFileById(req.params.id)
-            : await fileService.getFile(req.user._id, req.params.id);
+            : await fileService.getFile(userId, req.params.id);
         successResponse(res, "File retrieved successfully", file);
     });
 }

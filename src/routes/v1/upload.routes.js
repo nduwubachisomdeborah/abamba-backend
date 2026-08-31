@@ -8,8 +8,8 @@ const router = Router();
 router.post("/", optionalAuth(authenticate), upload.any(), uploadController.uploadFile);
 router.put("/", optionalAuth(authenticate), upload.any(), uploadController.uploadFile);
 
-router.delete("/:id", authenticate, uploadController.deleteFile);
+router.delete("/:id", optionalAuth(authenticate), uploadController.deleteFile);
 
-router.get("/:id", authenticate, uploadController.getFile);
+router.get("/:id", optionalAuth(authenticate), uploadController.getFile);
 
 export default router;

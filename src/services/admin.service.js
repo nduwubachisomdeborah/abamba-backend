@@ -177,6 +177,7 @@ class AdminService {
         }
 
         const sellers = await User.find(query)
+            .select("+business +bank")
             .populate("business.personalDocument")
             .populate("business.businessDocument")
             .populate("business.storeLocation")

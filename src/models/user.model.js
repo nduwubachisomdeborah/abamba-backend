@@ -309,6 +309,15 @@ const userSchema = new mongoose.Schema(
 // Add index for faster queries
 userSchema.index({ "addresses.coordinates": "2dsphere" });
 
+// Automatically delete abandoned guest accounts after 7 days
+userSchema.index(
+    { createdAt: 1 },
+    {
+        expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days in seconds
+        partialFilterExpression: { isGuest: true },
+    },
+);
+
 // Hash password before saving
 // Add active field to schema
 userSchema.add({

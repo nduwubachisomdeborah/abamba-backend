@@ -193,7 +193,7 @@ class ProductController {
      */
     static getProductViewed = asyncHandler(async (req, res) => {
         const limit = req.query.limit ? parseInt(req.query.limit) : 10;
-        const userId = req.user._id;
+        const userId = req.user?._id || req.user?.id;
         const productViewed = await productService.getProductViewed(
             userId,
             limit
@@ -213,7 +213,7 @@ class ProductController {
      */
     static addProductViewed = asyncHandler(async (req, res) => {
         const productId = req.params.productId;
-        const userId = req.user._id;
+        const userId = req.user?._id || req.user?.id;
         const productViewed = await productService.addProductViewed(
             userId,
             productId

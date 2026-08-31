@@ -50,7 +50,7 @@ class UploadService {
         if (!file) {
             throw new Error("File not found");
         }
-        if (userId && file.uploadedBy?.toString() !== userId?.toString()) {
+        if (file.uploadedBy && userId && file.uploadedBy.toString() !== userId.toString()) {
             throw new Error("You are not authorized to delete this file");
         }
 
