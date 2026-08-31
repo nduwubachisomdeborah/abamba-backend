@@ -614,23 +614,24 @@ class CategoryOptionsService {
                 }
             }
 
-            // Sync all default category options
+            // Sync and upsert all default category options
             for (const [category, options] of Object.entries(defaultCategoryOptions)) {
                 const normalizedCategory = category.trim().toLowerCase();
-                const existing = await CategoryOption.findOne({ category: normalizedCategory });
-
-                if (!existing) {
-                    await CategoryOption.create({
-                        category: normalizedCategory,
-                        options,
-                        approved: true,
-                    });
-                } else if (!existing.options || existing.options.length === 0) {
-                    existing.options = options;
-                    existing.approved = true;
-                    await existing.save();
-                }
+                await CategoryOption.findOneAndUpdate(
+                    { category: normalizedCategory },
+                    {
+                        $set: {
+                            category: normalizedCategory,
+                            options,
+                            approved: true,
+                        },
+                    },
+                    { upsert: true, new: true }
+                );
             }
+
+            // Ensure any custom or legacy category in database is also marked approved
+            await CategoryOption.updateMany({}, { $set: { approved: true } });
         } catch (error) {
             console.error("Failed to seed/sync category options:", error);
         }

@@ -155,24 +155,8 @@ const productSchema = new mongoose.Schema(
         category: {
             type: String,
             required: [true, "Please provide product category"],
-            // validate: {
-            //     validator: async function (value) {
-            //         if (!value) return false;
-
-            //         try {
-            //             const categoryExists = await CategoryOption.findOne({
-            //                 category: value?.toLowerCase(),
-            //                 approved: true,
-            //             });
-            //             return !!categoryExists;
-            //         } catch (error) {
-            //             return false;
-            //         }
-            //     },
-            //     message: function (props) {
-            //         return `Category '${props.value}' is not a valid category. Please check available categories.`;
-            //     },
-            // },
+            trim: true,
+            lowercase: true,
         },
         brand: {
             type: String,

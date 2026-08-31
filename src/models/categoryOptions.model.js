@@ -43,7 +43,7 @@ const categoryOptionSchema = new mongoose.Schema(
         },
         approved: {
             type: Boolean,
-            default: false,
+            default: true,
         },
         user: {
             type: mongoose.Schema.Types.ObjectId,
