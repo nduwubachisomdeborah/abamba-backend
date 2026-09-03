@@ -135,7 +135,10 @@ class ShipmentController {
     });
 
     static getCarriers = asyncHandler(async (req, res) => {
-        const { productId, shippingAddressId, variantId, quantity } = req.body;
+        const { productId, shippingAddressId, variantId, quantity, state } = {
+            ...req.query,
+            ...req.body,
+        };
         const userId = req.user?.id || null;
 
         const carriers = await shipmentService.getCarriers(
@@ -144,6 +147,7 @@ class ShipmentController {
             productId,
             variantId,
             quantity,
+            state,
         );
 
         return successResponse(

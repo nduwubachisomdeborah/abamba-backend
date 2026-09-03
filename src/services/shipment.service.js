@@ -452,9 +452,16 @@ class ShipmentService {
         productId,
         variantId,
         quantity,
+        stateParam,
     ) {
-        // Query active Regional Logistics Companies directly (Richmond, Apex, Hens, Prince Swift, OK Saturday)
-        const companies = await LogisticsCompany.find({ active: true });
+        // Resolve Target Location (Imo vs Abia)
+        let targetState = "Imo";
+        if (stateParam) {
+            targetState = stateParam.toLowerCase().includes("abia") ? "Abia" : "Imo";
+        }
+
+        // Query active Regional Logistics Companies directly
+        const allCompanies = await LogisticsCompany.find({ active: true });
         const defaultDeliveryFee = 3000;
         const request_token =
             "REQ-" +
@@ -462,66 +469,102 @@ class ShipmentService {
             "-" +
             Date.now();
 
+        // Sort so the companies for the customer's location appear first
+        const sortedCompanies = [...allCompanies].sort((a, b) => {
+            if (a.state === targetState && b.state !== targetState) return -1;
+            if (a.state !== targetState && b.state === targetState) return 1;
+            return 0;
+        });
+
         const couriersList =
-            companies.length > 0
-                ? companies.map((comp) => ({
+            sortedCompanies.length > 0
+                ? sortedCompanies.map((comp, index) => ({
                       courier_id: comp.code || comp._id.toString(),
+                      id: comp.code || comp._id.toString(),
+                      _id: comp._id,
                       courier_name: `${comp.name} (${comp.state} Hub)`,
+                      name: comp.name,
+                      title: comp.name,
+                      hub: comp.hub,
+                      state: comp.state,
+                      location: `${comp.state} State (${comp.hub})`,
                       courier_image: null,
                       service_code: comp.code || "regional",
                       total: comp.defaultBasePrice || defaultDeliveryFee,
+                      fee: comp.defaultBasePrice || defaultDeliveryFee,
+                      price: comp.defaultBasePrice || defaultDeliveryFee,
                       delivery_eta:
                           comp.state === "Imo"
                               ? "Same Day / Next Day"
                               : "1-2 Business Days",
+                      is_default: index === 0,
+                      selected: index === 0,
                   }))
                 : [
                       {
                           courier_id: "richmond",
+                          id: "richmond",
                           courier_name: "Richmond Logistics (Imo Hub)",
+                          name: "Richmond Logistics",
+                          hub: "Owerri Hub",
+                          state: "Imo",
+                          location: "Imo State (Owerri Hub)",
                           courier_image: null,
                           service_code: "richmond",
                           total: 3000,
+                          fee: 3000,
+                          price: 3000,
                           delivery_eta: "Same Day / Next Day",
+                          is_default: true,
+                          selected: true,
                       },
                       {
                           courier_id: "apex",
+                          id: "apex",
                           courier_name: "Apex Delivery (Abia Hub)",
+                          name: "Apex Delivery",
+                          hub: "Aba Hub",
+                          state: "Abia",
+                          location: "Abia State (Aba Hub)",
                           courier_image: null,
                           service_code: "apex",
                           total: 3000,
+                          fee: 3000,
+                          price: 3000,
                           delivery_eta: "1-2 Business Days",
+                          is_default: false,
+                          selected: false,
                       },
                       {
                           courier_id: "hens",
+                          id: "hens",
                           courier_name: "Hens Express (Imo Hub)",
+                          name: "Hens Express",
+                          hub: "Owerri Hub",
+                          state: "Imo",
+                          location: "Imo State (Owerri Hub)",
                           courier_image: null,
                           service_code: "hens",
                           total: 3000,
+                          fee: 3000,
+                          price: 3000,
                           delivery_eta: "Same Day / Next Day",
-                      },
-                      {
-                          courier_id: "princeswift",
-                          courier_name: "Prince Swift Logistics (Imo Hub)",
-                          courier_image: null,
-                          service_code: "princeswift",
-                          total: 3000,
-                          delivery_eta: "Same Day / Next Day",
-                      },
-                      {
-                          courier_id: "oksaturday",
-                          courier_name: "OK Saturday Express (Abia Hub)",
-                          courier_image: null,
-                          service_code: "oksaturday",
-                          total: 3000,
-                          delivery_eta: "1-2 Business Days",
+                          is_default: false,
+                          selected: false,
                       },
                   ];
 
+        const primaryCourier = couriersList[0];
+
         const responseData = {
             request_token,
-            fastest_courier: couriersList[0],
-            cheapest_courier: couriersList[0],
+            default_location: {
+                state: targetState,
+                hub: targetState === "Imo" ? "Owerri Hub" : "Aba Hub",
+            },
+            default_company: primaryCourier,
+            fastest_courier: primaryCourier,
+            cheapest_courier: primaryCourier,
             couriers: couriersList,
         };
 
@@ -530,9 +573,9 @@ class ShipmentService {
             await ShippingOptions.create({
                 user: userId || null,
                 request_token,
-                service_code: responseData.fastest_courier.service_code,
-                courier_id: responseData.fastest_courier.courier_id,
-                courier_name: responseData.fastest_courier.courier_name,
+                service_code: primaryCourier.service_code,
+                courier_id: primaryCourier.courier_id,
+                courier_name: primaryCourier.courier_name,
                 data: responseData,
                 product: productId,
                 variant: variantId,
