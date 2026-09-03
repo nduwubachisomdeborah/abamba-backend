@@ -52,18 +52,27 @@ class WishlistController {
   });
   
   /**
-   * @desc    Add product to default wishlist
+   * @desc    Toggle product in default wishlist (Add if absent, remove if present)
    * @route   POST /api/v1/wishlists/products
    * @access  Private
    */
   static addProductToDefaultWishlist = asyncHandler(async (req, res) => {
-    const wishlist = await wishlistService.addProductToWishlist(
-      null, // No wishlist ID - will use default
+    const result = await wishlistService.toggleWishlistProduct(
       req.user.id,
-      req.body
+      req.body.productId
     );
     
-    return successResponse(res, 'Product added to default wishlist successfully', wishlist);
+    return res.status(200).json({
+      status: "success",
+      success: true,
+      message: result.isWishlisted ? "Added to wishlist" : "Removed from wishlist",
+      data: {
+        isWishlisted: result.isWishlisted,
+        isInWishlist: result.isInWishlist,
+        count: result.count,
+        wishlist: result.wishlist
+      }
+    });
   });
 
   /**

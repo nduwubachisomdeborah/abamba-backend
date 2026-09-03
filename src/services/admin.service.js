@@ -756,6 +756,7 @@ class AdminService {
             "timeZone",
             "logo",
             "favicon",
+            "isBonusEventActive",
         ];
 
         topLevelFields.forEach((field) => {

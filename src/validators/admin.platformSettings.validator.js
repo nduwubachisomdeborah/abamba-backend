@@ -10,6 +10,7 @@ export const updatePlatformSettingsSchema = Joi.object({
     timeZone: Joi.string().trim().optional(),
     logo: Joi.string().uri().trim().optional().allow(""),
     favicon: Joi.string().uri().trim().optional().allow(""),
+    isBonusEventActive: Joi.boolean().optional(),
     
     // Social Media Links
     socialMedia: Joi.object({

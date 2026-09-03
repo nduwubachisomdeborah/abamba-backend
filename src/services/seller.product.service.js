@@ -121,6 +121,23 @@ class SellerProductService {
             productData.onSale = true;
         }
 
+        // Handle bonus pricing
+        if (
+            productData.bonusPrice !== undefined &&
+            productData.bonusPrice !== null &&
+            productData.bonusPrice !== ""
+        ) {
+            productData.bonusPrice = Number(productData.bonusPrice);
+            if (productData.bonusPrice <= 0) {
+                productData.bonusPrice = null;
+            } else if (productData.bonusPrice >= productData.basePrice) {
+                throw new AppError(
+                    "Bonus price must be less than the base price",
+                    400
+                );
+            }
+        }
+
         // Create the product
         const product = await Product.create(productData);
         return product;
@@ -216,6 +233,26 @@ class SellerProductService {
                 }
 
                 updateData.onSale = true;
+            }
+        }
+
+        // Handle bonus pricing
+        if (updateData.bonusPrice !== undefined) {
+            if (
+                updateData.bonusPrice === null ||
+                updateData.bonusPrice === "" ||
+                Number(updateData.bonusPrice) <= 0
+            ) {
+                updateData.bonusPrice = null;
+            } else {
+                updateData.bonusPrice = Number(updateData.bonusPrice);
+                const basePrice = updateData.basePrice || product.basePrice;
+                if (updateData.bonusPrice >= basePrice) {
+                    throw new AppError(
+                        "Bonus price must be less than the base price",
+                        400
+                    );
+                }
             }
         }
 

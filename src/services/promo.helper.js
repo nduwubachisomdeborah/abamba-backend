@@ -20,6 +20,14 @@ export const processPromoInfo = (productObj, product) => {
     productObj.formattedPromoPrice = product.formattedPromoPrice;
   }
   
+  // Include bonus price if available
+  if (product.bonusPrice !== undefined) {
+    productObj.bonusPrice = product.bonusPrice;
+    if (product.bonusPrice) {
+      productObj.formattedBonusPrice = `₦${Number(product.bonusPrice).toFixed(2)}`;
+    }
+  }
+  
   // Add discount percentage if promo is active
   if (productObj.promoActive && productObj.promoPrice && productObj.basePrice) {
     const discount = productObj.basePrice - productObj.promoPrice;

@@ -219,8 +219,13 @@ const userSchema = new mongoose.Schema(
         },
         role: {
             type: String,
-            enum: ["user", "seller", "admin"],
+            enum: ["user", "buyer", "seller", "admin"],
             default: "user",
+        },
+        roles: {
+            type: [String],
+            enum: ["user", "buyer", "seller", "admin", "superAdmin"],
+            default: ["buyer"],
         },
         wallet: {
             balance: {
@@ -433,9 +438,17 @@ userSchema.methods.passwordChangedAfter = function (JWTTimestamp) {
 
 // Generate JWT token
 userSchema.methods.generateAuthToken = function () {
-    return jwt.sign({ id: this._id, role: this.role }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRES_IN,
-    });
+    return jwt.sign(
+        {
+            id: this._id,
+            role: this.role,
+            roles: this.roles || [this.role],
+        },
+        process.env.JWT_SECRET,
+        {
+            expiresIn: process.env.JWT_EXPIRES_IN,
+        }
+    );
 };
 
 const User = mongoose.model("User", userSchema);

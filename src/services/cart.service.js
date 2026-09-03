@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import ShippingOptions from "../models/shippingOptions.model.js";
 import shipbubbleService from "./shiping/shipbubble.service.js";
 import addressService from "./address.service.js";
+import PlatformSettings from "../models/platformSettings.model.js";
 
 class CartService {
     /**
@@ -343,10 +344,14 @@ class CartService {
      * @returns {Promise<Object>} Populated cart with enhanced variant information
      */
     async populateCart(cart) {
+        // Fetch platform settings to check if global bonus week is active
+        const platformSettings = await PlatformSettings.getInstance();
+        const isBonusActive = Boolean(platformSettings?.isBonusEventActive);
+
         // First populate just the products
         const populatedCart = await Cart.findById(cart._id).populate({
             path: "items.product",
-            select: "name images basePrice sku deleted variants variantAttributes promoPrice onSale saleStartDate saleEndDate",
+            select: "name images basePrice sku deleted variants variantAttributes promoPrice bonusPrice onSale saleStartDate saleEndDate",
         });
 
         // If cart doesn't exist or is empty, return early
@@ -377,7 +382,8 @@ class CartService {
                 }
 
                 // Set default price to product base price
-                itemObj.price = product.basePrice;
+                let regularPrice = product.basePrice;
+                let finalPrice = product.basePrice;
                 itemObj.isAvailable = true;
 
                 // If there's a variant ID, fetch complete variant details directly from the product model
@@ -399,14 +405,13 @@ class CartService {
                                 // Add variant details to the cart item
                                 const variantObj = variant.toObject();
                                 itemObj.variantDetails = variantObj;
+                                regularPrice = variant.price;
 
                                 // Extract variant attributes for easier access
                                 if (variantObj.attributes) {
-                                    // Convert Map to object if needed (should be handled by toObject transform)
                                     itemObj.variantAttributes =
                                         variantObj.attributes;
 
-                                    // Create a formatted string of variant attributes for display
                                     const attributeEntries = Object.entries(
                                         variantObj.attributes
                                     );
@@ -421,19 +426,33 @@ class CartService {
                                     }
                                 }
 
-                                // Update price from the variant
+                                // Check price priority: Bonus Price > Promo Price > Regular Price
+                                const variantBonus =
+                                    variant.bonusPrice !== undefined &&
+                                    variant.bonusPrice !== null
+                                        ? variant.bonusPrice
+                                        : product.bonusPrice;
+
                                 if (
+                                    isBonusActive &&
+                                    variantBonus !== undefined &&
+                                    variantBonus !== null &&
+                                    variantBonus > 0 &&
+                                    variantBonus < variant.price
+                                ) {
+                                    finalPrice = variantBonus;
+                                    itemObj.isBonusPrice = true;
+                                    itemObj.regularPrice = variant.price;
+                                } else if (
                                     fullProduct.onSale &&
                                     fullProduct.promoActive &&
                                     variant.promoPrice
                                 ) {
-                                    // Use promotional price if available and promotion is active
-                                    itemObj.price = variant.promoPrice;
+                                    finalPrice = variant.promoPrice;
                                     itemObj.isOnSale = true;
                                     itemObj.regularPrice = variant.price;
                                 } else {
-                                    // Use regular variant price
-                                    itemObj.price = variant.price;
+                                    finalPrice = variant.price;
                                 }
 
                                 // Check if variant is in stock
@@ -459,16 +478,32 @@ class CartService {
                         itemObj.unavailableReason =
                             "Error loading variant details";
                     }
-                } else if (
-                    product.onSale &&
-                    product.promoActive &&
-                    product.promoPrice
-                ) {
-                    // If no variant but product has promotional pricing
-                    itemObj.price = product.promoPrice;
-                    itemObj.isOnSale = true;
-                    itemObj.regularPrice = product.basePrice;
+                } else {
+                    // No variant - check product bonus and promo pricing
+                    if (
+                        isBonusActive &&
+                        product.bonusPrice !== undefined &&
+                        product.bonusPrice !== null &&
+                        product.bonusPrice > 0 &&
+                        product.bonusPrice < product.basePrice
+                    ) {
+                        finalPrice = product.bonusPrice;
+                        itemObj.isBonusPrice = true;
+                        itemObj.regularPrice = product.basePrice;
+                    } else if (
+                        product.onSale &&
+                        product.promoActive &&
+                        product.promoPrice
+                    ) {
+                        finalPrice = product.promoPrice;
+                        itemObj.isOnSale = true;
+                        itemObj.regularPrice = product.basePrice;
+                    } else {
+                        finalPrice = product.basePrice;
+                    }
                 }
+
+                itemObj.price = finalPrice;
 
                 // Update totals (only count available items in total)
                 if (itemObj.isAvailable) {

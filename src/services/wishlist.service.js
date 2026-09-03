@@ -125,6 +125,92 @@ class WishlistService {
     }
 
     /**
+     * Toggle a product in user's default wishlist
+     * @param {string} userId - User ID
+     * @param {string} productId - Product ID
+     * @returns {Promise<Object>} Toggle result
+     */
+    async toggleWishlistProduct(userId, productId) {
+        if (!productId) {
+            throw new AppError("Product ID is required", 400);
+        }
+
+        // Validate product exists
+        const product = await Product.findById(productId);
+        if (!product || product.deleted) {
+            throw new AppError("Product not found or unavailable", 404);
+        }
+
+        let wishlist = await Wishlist.findOne({ user: userId, name: "Wishlist" });
+        if (!wishlist) {
+            wishlist = await Wishlist.create({
+                user: userId,
+                name: "Wishlist",
+                products: [],
+            });
+        }
+
+        const index = wishlist.products.findIndex(
+            (p) => p.product?.toString() === productId.toString()
+        );
+
+        let isAdded = false;
+        if (index > -1) {
+            // Product already in wishlist -> Remove it
+            wishlist.products.splice(index, 1);
+            isAdded = false;
+        } else {
+            // Product not in wishlist -> Add it
+            wishlist.products.push({
+                product: productId,
+                addedAt: new Date(),
+            });
+            isAdded = true;
+        }
+
+        await wishlist.save();
+
+        const populated = await Wishlist.findById(wishlist._id).populate(
+            "products.product"
+        );
+
+        return {
+            isWishlisted: isAdded,
+            isInWishlist: isAdded,
+            count: wishlist.products.length,
+            wishlist: populated,
+        };
+    }
+
+    /**
+     * Fast lookup set of product IDs in user's wishlist
+     * @param {string} userId - User ID
+     * @returns {Promise<Set<string>>} Set of product IDs
+     */
+    async getUserWishlistProductIdsSet(userId) {
+        if (!userId) return new Set();
+        try {
+            const wishlists = await Wishlist.find({ user: userId }).select(
+                "products.product"
+            );
+            const idSet = new Set();
+            for (const wl of wishlists) {
+                if (wl.products && Array.isArray(wl.products)) {
+                    for (const item of wl.products) {
+                        if (item.product) {
+                            idSet.add(item.product.toString());
+                        }
+                    }
+                }
+            }
+            return idSet;
+        } catch (error) {
+            console.error("Error retrieving wishlist product ids set:", error);
+            return new Set();
+        }
+    }
+
+    /**
      * Add a product to a wishlist
      * @param {string} wishlistId - Wishlist ID (optional, if not provided default wishlist will be used)
      * @param {string} userId - User ID
@@ -180,8 +266,7 @@ class WishlistService {
         await wishlist.save();
 
         return await Wishlist.findById(wishlist._id).populate(
-            "products.product",
-            "name price images description"
+            "products.product"
         );
     }
 

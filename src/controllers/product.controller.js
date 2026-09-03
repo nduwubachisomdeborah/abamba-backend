@@ -27,8 +27,28 @@ class ProductController {
             enhancedQuery
         );
 
+        // Check user's wishlist if authenticated
+        let enhancedProducts = products;
+        if (req.user?.id && Array.isArray(products)) {
+            const wishlistSet = await wishlistService.getUserWishlistProductIdsSet(
+                req.user.id
+            );
+            enhancedProducts = products.map((p) => {
+                const pObj = typeof p.toObject === "function" ? p.toObject() : { ...p };
+                const pId = (pObj._id || pObj.id)?.toString();
+                pObj.isInWishlist = wishlistSet.has(pId);
+                return pObj;
+            });
+        } else if (Array.isArray(products)) {
+            enhancedProducts = products.map((p) => {
+                const pObj = typeof p.toObject === "function" ? p.toObject() : { ...p };
+                pObj.isInWishlist = false;
+                return pObj;
+            });
+        }
+
         return successResponse(res, "Products retrieved successfully", {
-            products,
+            products: enhancedProducts,
             pagination,
         });
     });
@@ -56,16 +76,19 @@ class ProductController {
 
         // Check if product is in user's wishlist (only for authenticated users)
         let wishlistInfo = { isInWishlist: false, wishlist: null };
+        let isInWishlist = false;
         if (req.user?.id) {
             wishlistInfo = await wishlistService.isProductInWishlist(
                 req.user.id,
                 req.params.id
             );
+            isInWishlist = Boolean(wishlistInfo.isInWishlist);
         }
 
-        // Add wishlist information to the product response
+        // Add wishlist information and top-level isInWishlist flag
         const productWithWishlistInfo = {
-            ...product,
+            ...(typeof product?.toObject === "function" ? product.toObject() : product),
+            isInWishlist,
             wishlistInfo,
         };
 
@@ -90,10 +113,29 @@ class ProductController {
             includeRatingStats
         );
 
+        let enhancedProducts = products;
+        if (req.user?.id && Array.isArray(products)) {
+            const wishlistSet = await wishlistService.getUserWishlistProductIdsSet(
+                req.user.id
+            );
+            enhancedProducts = products.map((p) => {
+                const pObj = typeof p.toObject === "function" ? p.toObject() : { ...p };
+                const pId = (pObj._id || pObj.id)?.toString();
+                pObj.isInWishlist = wishlistSet.has(pId);
+                return pObj;
+            });
+        } else if (Array.isArray(products)) {
+            enhancedProducts = products.map((p) => {
+                const pObj = typeof p.toObject === "function" ? p.toObject() : { ...p };
+                pObj.isInWishlist = false;
+                return pObj;
+            });
+        }
+
         return successResponse(
             res,
             "Featured products retrieved successfully",
-            products
+            enhancedProducts
         );
     });
 

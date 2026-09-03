@@ -11,6 +11,7 @@ import User from "../models/user.model.js";
 import notificationService from "./notification.service.js";
 import LogisticsCompany from "../models/logisticsCompany.model.js";
 import emailService from "./email.service.js";
+import PlatformSettings from "../models/platformSettings.model.js";
 
 class PaymentService {
     /**
@@ -124,6 +125,10 @@ class PaymentService {
             throw new AppError("Cart is empty", 400);
         }
 
+        // Fetch platform settings for global bonus promotions
+        const platformSettings = await PlatformSettings.getInstance();
+        const isBonusActive = Boolean(platformSettings?.isBonusEventActive);
+
         // Build order items with validation against products/variants
         const enrichedItems = await Promise.all(
             cart.items.map(async (citem) => {
@@ -135,8 +140,10 @@ class PaymentService {
                     );
                 }
                 let variant = null;
-                let price = product.basePrice;
-                let shippingCost = citem.shipping.amount || 0;
+                let regularPrice = product.basePrice;
+                let promoPrice = product.promoPrice;
+                let itemBonusPrice = product.bonusPrice;
+                let shippingCost = citem.shipping?.amount || 0;
                 let sku = product.sku;
                 let imageUrl = product.images?.[0]?.url || null;
                 let variantAttributes = {};
@@ -154,7 +161,13 @@ class PaymentService {
                             400,
                         );
                     }
-                    price = variant.price;
+                    regularPrice = variant.price;
+                    promoPrice = variant.promoPrice;
+                    itemBonusPrice =
+                        variant.bonusPrice !== undefined &&
+                        variant.bonusPrice !== null
+                            ? variant.bonusPrice
+                            : product.bonusPrice;
                     sku = variant.sku;
                     if (variant.images && variant.images.length > 0)
                         imageUrl = variant.images[0].url;
@@ -171,6 +184,26 @@ class PaymentService {
                             400,
                         );
                     }
+                }
+
+                // Server-side price calculation with priority: Bonus Price > Promo Price > Regular Price
+                let price = regularPrice;
+                if (
+                    isBonusActive &&
+                    itemBonusPrice !== undefined &&
+                    itemBonusPrice !== null &&
+                    itemBonusPrice > 0 &&
+                    itemBonusPrice < regularPrice
+                ) {
+                    price = itemBonusPrice;
+                } else if (
+                    product.onSale &&
+                    product.promoActive &&
+                    promoPrice &&
+                    promoPrice > 0 &&
+                    promoPrice < regularPrice
+                ) {
+                    price = promoPrice;
                 }
 
                 return {

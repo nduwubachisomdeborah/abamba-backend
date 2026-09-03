@@ -28,6 +28,10 @@ const variantSchema = Joi.object({
         "number.base": "Promotional price must be a number",
         "number.min": "Promotional price must be a positive number",
     }),
+    bonusPrice: Joi.number().min(0).allow(null).messages({
+        "number.base": "Bonus price must be a number",
+        "number.min": "Bonus price must be a positive number",
+    }),
     quantity: Joi.number().required().min(0).messages({
         "number.base": "Quantity must be a number",
         "number.min": "Quantity cannot be negative",
@@ -89,6 +93,10 @@ const productSchema = Joi.object({
     promoPrice: Joi.number().min(0).allow(null).messages({
         "number.base": "Promotional price must be a number",
         "number.min": "Promotional price must be a positive number",
+    }),
+    bonusPrice: Joi.number().min(0).allow(null).messages({
+        "number.base": "Bonus price must be a number",
+        "number.min": "Bonus price must be a positive number",
     }),
     onSale: Joi.boolean().messages({
         "boolean.base": "On sale flag must be a boolean",

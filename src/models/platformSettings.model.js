@@ -85,6 +85,12 @@ const platformSettingsSchema = new mongoose.Schema(
             },
         },
 
+        // Global Bonus Week / Promotion Status
+        isBonusEventActive: {
+            type: Boolean,
+            default: false,
+        },
+
         // Security & Configurations
         security: {
             passwordPolicy: {

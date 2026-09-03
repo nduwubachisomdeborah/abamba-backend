@@ -19,6 +19,11 @@ const variantSchema = new mongoose.Schema({
         min: [0, "Promotional price must be a positive number"],
         default: null,
     },
+    bonusPrice: {
+        type: Number,
+        min: [0, "Bonus price must be a positive number"],
+        default: null,
+    },
     quantity: {
         type: Number,
         required: [true, "Please provide variant quantity"],
@@ -134,6 +139,11 @@ const productSchema = new mongoose.Schema(
         promoPrice: {
             type: Number,
             min: [0, "Promotional price must be a positive number"],
+            default: null,
+        },
+        bonusPrice: {
+            type: Number,
+            min: [0, "Bonus price must be a positive number"],
             default: null,
         },
         onSale: {

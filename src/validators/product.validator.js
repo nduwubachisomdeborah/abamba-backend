@@ -24,6 +24,8 @@ const variantSchema = Joi.object({
         "number.min": "Variant price must be a positive number",
         "any.required": "Variant price is required",
     }),
+    promoPrice: Joi.number().min(0).allow(null).optional(),
+    bonusPrice: Joi.number().min(0).allow(null).optional(),
     quantity: Joi.number().required().min(0).integer().messages({
         "number.base": "Variant quantity must be a number",
         "number.min": "Variant quantity cannot be negative",
@@ -63,6 +65,8 @@ export const createProductSchema = Joi.object({
         "number.min": "Base price must be a positive number",
         "any.required": "Base price is required",
     }),
+    promoPrice: Joi.number().min(0).allow(null).optional(),
+    bonusPrice: Joi.number().min(0).allow(null).optional(),
     category: Joi.string().required().messages({
         "string.base": "Category must be a string",
         "string.empty": "Category is required",
@@ -109,6 +113,8 @@ export const updateProductSchema = Joi.object({
         "number.base": "Base price must be a number",
         "number.min": "Base price must be a positive number",
     }),
+    promoPrice: Joi.number().min(0).allow(null).optional(),
+    bonusPrice: Joi.number().min(0).allow(null).optional(),
     category: Joi.string().messages({
         "string.base": "Category must be a string",
     }),

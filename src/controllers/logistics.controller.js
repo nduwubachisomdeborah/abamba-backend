@@ -120,6 +120,7 @@ export const getCheckoutLogistics = async (req, res) => {
             const fallbackCompany =
                 allCompanies.find((c) => c.state === state) || allCompanies[0];
             return res.status(200).json({
+                status: "success",
                 success: true,
                 data: {
                     defaultCompany: fallbackCompany,
@@ -176,6 +177,7 @@ export const getCheckoutLogistics = async (req, res) => {
         }));
 
         return res.status(200).json({
+            status: "success",
             success: true,
             data: {
                 defaultCompany,

@@ -13,24 +13,74 @@ class AuthService {
      * @returns {Promise<Object>} User object with OTP and token
      */
     async signup(userData, role = "user") {
+        const normalizedRole = role === "user" ? "buyer" : role;
+
         // Check if user with this email already exists
         const existingUser = await User.findOne({
             email: userData.email,
-            role,
         });
 
         if (existingUser) {
-            throw new AppError("User with this email already exists", 400);
+            if (!existingUser.roles || !Array.isArray(existingUser.roles)) {
+                existingUser.roles = [existingUser.role || "buyer"];
+            }
+
+            if (
+                !existingUser.roles.includes(normalizedRole) &&
+                !existingUser.roles.includes("buyer") &&
+                !existingUser.roles.includes("user")
+            ) {
+                // Seamlessly append buyer role for existing seller/user
+                existingUser.roles.push(normalizedRole);
+                await existingUser.save();
+            } else if (existingUser.role === role) {
+                throw new AppError("User with this email already exists", 400);
+            }
+
+            // Generate OTP for verification
+            const otpCode = generateOTP();
+            const otpExpiry = getOTPExpiry();
+
+            existingUser.otp = {
+                code: otpCode,
+                expiresAt: otpExpiry,
+                verified: false,
+            };
+            await existingUser.save();
+
+            try {
+                await emailService.sendEmail(
+                    userData.email,
+                    "Verify Your Account",
+                    "otp-verification",
+                    {
+                        name: existingUser.name || userData.name,
+                        otpCode,
+                        purpose: "account verification",
+                        expiryTime: 10,
+                    }
+                );
+            } catch (error) {
+                console.error("Failed to send OTP email:", error);
+            }
+
+            const userObject = existingUser.toObject();
+            delete userObject.password;
+            if (userObject.otp) delete userObject.otp.code;
+
+            return {
+                user: userObject,
+                message: OTP_SENT,
+            };
         }
 
         // Check if user with this phone number already exists (only if phoneNumber is provided)
         if (userData.phoneNumber) {
             const existingPhone = await User.findOne({
                 phoneNumber: userData.phoneNumber,
-                role,
             });
 
-            if (existingPhone) {
+            if (existingPhone && existingPhone.role === role) {
                 throw new AppError(
                     "User with this phone number already exists",
                     400
@@ -42,7 +92,7 @@ class AuthService {
         const otpCode = generateOTP();
         const otpExpiry = getOTPExpiry();
 
-        // Create user with OTP
+        // Create user with OTP and roles array
         const user = new User({
             ...userData,
             otp: {
@@ -51,6 +101,7 @@ class AuthService {
                 verified: false,
             },
             role,
+            roles: [normalizedRole],
         });
 
         await user.save();
