@@ -1,7 +1,6 @@
 import express from "express";
 import ShipmentController from "../../controllers/shipment.controller.js";
-import { authenticate } from "../../middlewares/auth.js";
-import { adminOnly } from "../../middlewares/auth.js";
+import { authenticate, adminOnly, optionalAuth } from "../../middlewares/auth.js";
 import { sellerOrAdmin } from "../../middlewares/seller.js";
 import {
     validateCreateShipment,
