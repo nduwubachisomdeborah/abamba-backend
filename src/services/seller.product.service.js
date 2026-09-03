@@ -121,20 +121,56 @@ class SellerProductService {
             productData.onSale = true;
         }
 
-        // Handle bonus pricing
+        // Validate and enforce required bonusPrice
         if (
-            productData.bonusPrice !== undefined &&
-            productData.bonusPrice !== null &&
-            productData.bonusPrice !== ""
+            productData.bonusPrice === undefined ||
+            productData.bonusPrice === null ||
+            productData.bonusPrice === ""
         ) {
-            productData.bonusPrice = Number(productData.bonusPrice);
-            if (productData.bonusPrice <= 0) {
-                productData.bonusPrice = null;
-            } else if (productData.bonusPrice >= productData.basePrice) {
-                throw new AppError(
-                    "Bonus price must be less than the base price",
-                    400
-                );
+            throw new AppError("Bonus price is required", 400);
+        }
+
+        productData.bonusPrice = Number(productData.bonusPrice);
+        if (isNaN(productData.bonusPrice) || productData.bonusPrice <= 0) {
+            throw new AppError(
+                "Bonus price must be a positive number greater than 0",
+                400
+            );
+        }
+
+        if (productData.bonusPrice >= productData.basePrice) {
+            throw new AppError(
+                "Bonus price must be less than the product base price",
+                400
+            );
+        }
+
+        // Also enforce on variants if provided
+        if (Array.isArray(productData.variants) && productData.variants.length > 0) {
+            for (const v of productData.variants) {
+                if (
+                    v.bonusPrice === undefined ||
+                    v.bonusPrice === null ||
+                    v.bonusPrice === ""
+                ) {
+                    throw new AppError(
+                        "Bonus price is required for each variant",
+                        400
+                    );
+                }
+                v.bonusPrice = Number(v.bonusPrice);
+                if (isNaN(v.bonusPrice) || v.bonusPrice <= 0) {
+                    throw new AppError(
+                        "Variant bonus price must be greater than 0",
+                        400
+                    );
+                }
+                if (v.bonusPrice >= v.price) {
+                    throw new AppError(
+                        "Variant bonus price must be less than the variant price",
+                        400
+                    );
+                }
             }
         }
 
@@ -238,21 +274,19 @@ class SellerProductService {
 
         // Handle bonus pricing
         if (updateData.bonusPrice !== undefined) {
-            if (
-                updateData.bonusPrice === null ||
-                updateData.bonusPrice === "" ||
-                Number(updateData.bonusPrice) <= 0
-            ) {
-                updateData.bonusPrice = null;
-            } else {
-                updateData.bonusPrice = Number(updateData.bonusPrice);
-                const basePrice = updateData.basePrice || product.basePrice;
-                if (updateData.bonusPrice >= basePrice) {
-                    throw new AppError(
-                        "Bonus price must be less than the base price",
-                        400
-                    );
-                }
+            updateData.bonusPrice = Number(updateData.bonusPrice);
+            if (isNaN(updateData.bonusPrice) || updateData.bonusPrice <= 0) {
+                throw new AppError(
+                    "Bonus price must be a positive number greater than 0",
+                    400
+                );
+            }
+            const basePrice = updateData.basePrice || product.basePrice;
+            if (updateData.bonusPrice >= basePrice) {
+                throw new AppError(
+                    "Bonus price must be less than the product base price",
+                    400
+                );
             }
         }
 
