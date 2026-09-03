@@ -52,59 +52,56 @@ if (missingEnvVars.length > 0) {
 // Initialize app
 const app = express();
 
-// Security middleware
-// app.use(helmet());
+// Security middleware - Secure HTTP headers without blocking cross-origin media
+app.use(
+    helmet({
+        crossOriginResourcePolicy: { policy: "cross-origin" },
+        crossOriginEmbedderPolicy: false,
+    })
+);
 
-// Rate limiting
-// const limiter = rateLimit({
-//     windowMs: 15 * 60 * 1000, // 15 minutes
-//     max: 100, // limit each IP to 100 requests per windowMs
-//     standardHeaders: true,
-//     legacyHeaders: false,
-//     message: {
-//         success: false,
-//         message: "Too many requests, please try again later.",
-//     },
-// });
-// app.use(limiter);
+// Generous Rate Limiter (600 requests per 15 minutes to block malicious bots while allowing fast shopping)
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 600,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) =>
+        req.path === "/health" ||
+        req.path === "/" ||
+        req.path.startsWith("/api/v1/webhooks"),
+    message: {
+        success: false,
+        status: "fail",
+        message: "Too many requests from this IP, please try again after 15 minutes.",
+    },
+});
+app.use(limiter);
 
 // CORS middleware
 app.use(cors());
 
 // Body parser middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Debug middleware (logs request/response when DEBUG=true or in development)
-// app.use(conditionalDebugLogger);
-
-// Setup request logging
-// Create a logs directory if it doesn't exist
-const logDir = path.join(__dirname, "logs");
-if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir);
-}
-
-// Create a write stream for access logs
-const accessLogStream = fs.createWriteStream(path.join(logDir, "access.log"), {
-    flags: "a",
-});
-
-// Setup morgan logger
-// Use 'combined' format for production and 'dev' for development
+// Setup cloud-native request logging (stdout / dev)
 const morganFormat = process.env.NODE_ENV === "production" ? "combined" : "dev";
-app.use(morgan(morganFormat, { stream: accessLogStream }));
+app.use(morgan(morganFormat));
 
-// Also log to console in development
-// if (process.env.NODE_ENV !== "production") {
-app.use(morgan("dev"));
-// }
+// Connect to database with high-performance connection pool
+const mongooseOptions = {
+    maxPoolSize: parseInt(process.env.MONGODB_MAX_POOL_SIZE || "50", 10),
+    minPoolSize: parseInt(process.env.MONGODB_MIN_POOL_SIZE || "10", 10),
+    socketTimeoutMS: 45000,
+    serverSelectionTimeoutMS: 10000,
+    family: 4, // IPv4 lookup for faster DNS
+};
 
-// Connect to database
 mongoose
-    .connect(process.env.MONGODB_URI)
+    .connect(process.env.MONGODB_URI, mongooseOptions)
     .then((mon) => {
-        console.log("Connected to MongoDB");
+        console.log("✅ Connected to MongoDB with Connection Pool (maxPoolSize: 50)");
         // Initialize category options after database connection
         initializeCategoryOptions();
         initializeStoreLocations();
