@@ -22,7 +22,7 @@ class CartController {
   static addItem = asyncHandler(async (req, res) => {
     const cart = await cartService.addItem(req.user.id, req.body);
     
-    return successResponse(res, 'Item added to cart successfully', cart);
+    return successResponse(res, 'Item added to cart', cart);
   });
   
   /**
