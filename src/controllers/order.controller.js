@@ -27,17 +27,38 @@ class OrderController {
       req.body.shippingAddress = defaultAddr;
     }
 
-    const result = await orderService.createOrder(req.user.id, req.body);
-    
+    const primaryOrderId =
+      result.orderId ||
+      result.orders?.[0]?._id ||
+      result.orderHolder?._id;
+    const primaryOrderNum =
+      result.orderHolder?.orderId ||
+      result.orders?.[0]?.orderId ||
+      `ORD-${primaryOrderId}`;
+    const primaryTotal =
+      result.totalAmount ||
+      result.orderHolder?.total ||
+      result.total;
+
     return res.status(201).json({
       success: true,
       message: "Order created successfully",
       data: {
-        orderId: result.orderId || result.orders?.[0]?._id || result.orderHolder?._id,
-        totalAmount: result.totalAmount || result.orderHolder?.total,
-        authorization_url: result.authorization_url || result.providerInit?.data?.authorization_url,
-        access_code: result.access_code || result.providerInit?.data?.access_code,
+        order: {
+          _id: primaryOrderId,
+          orderId: primaryOrderNum,
+          total: primaryTotal,
+        },
+        orderId: primaryOrderId,
+        totalAmount: primaryTotal,
+        authorization_url:
+          result.authorization_url ||
+          result.providerInit?.data?.authorization_url,
+        access_code:
+          result.access_code ||
+          result.providerInit?.data?.access_code,
         reference: result.reference || result.payment?.reference,
+        providerInit: result.providerInit,
         ...result,
       },
     });

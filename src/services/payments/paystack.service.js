@@ -2,20 +2,35 @@ import axios from "axios";
 import { genUnique } from "../../helpers/index.js";
 
 class PaystackService {
-    constructor() {
-        this.secretKey = process.env.PAYSTACK_API_KEY;
-        this.currency = process.env.CURRENCY || "NGN";
-        this.api = axios.create({
-            baseURL: "https://api.paystack.co",
+    get secretKey() {
+        return (
+            process.env.PAYSTACK_SECRET_KEY ||
+            process.env.PAYSTACK_API_KEY ||
+            ""
+        ).trim();
+    }
+
+    get baseURL() {
+        return process.env.PAYSTACK_BASE_URL || "https://api.paystack.co";
+    }
+
+    get currency() {
+        return process.env.CURRENCY || "NGN";
+    }
+
+    get api() {
+        const key = this.secretKey;
+        const instance = axios.create({
+            baseURL: this.baseURL,
             headers: {
-                Authorization: `Bearer ${this.secretKey}`,
+                Authorization: `Bearer ${key}`,
                 "Content-Type": "application/json",
             },
             timeout: 30000, // 30 second timeout
         });
 
         // Debug interceptor for requests
-        this.api.interceptors.request.use(
+        instance.interceptors.request.use(
             (config) => {
                 console.log(
                     `[PaystackService] Request: ${config.method?.toUpperCase()} ${config.url}`,
@@ -32,7 +47,7 @@ class PaystackService {
         );
 
         // Debug interceptor for responses
-        this.api.interceptors.response.use(
+        instance.interceptors.response.use(
             (response) => {
                 console.log(
                     `[PaystackService] Response: ${response.status} from ${response.config.url}`,
@@ -57,6 +72,8 @@ class PaystackService {
                 return Promise.reject(error);
             },
         );
+
+        return instance;
     }
 
     getReference() {

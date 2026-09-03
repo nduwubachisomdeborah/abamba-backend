@@ -88,8 +88,20 @@ class PaymentService {
             shippingAddress &&
             mongoose.Types.ObjectId.isValid(shippingAddress)
         ) {
-            const savedAddress = user.addresses.id(shippingAddress);
-            if (!savedAddress) throw new AppError("Address not found", 404);
+            const savedAddress =
+                user.addresses?.id?.(shippingAddress) ||
+                user.addresses?.find(
+                    (a) => a._id?.toString() === shippingAddress.toString(),
+                ) ||
+                user.addresses?.find((a) => a.isDefault) ||
+                user.addresses?.[0];
+
+            if (!savedAddress) {
+                throw new AppError(
+                    "Shipping address not found. Please add a shipping address.",
+                    404,
+                );
+            }
 
             finalShippingAddress = {
                 fullName: savedAddress.fullName || user.name || "Customer",
@@ -102,13 +114,25 @@ class PaymentService {
                 phoneNumber: savedAddress.phoneNumber || user.phoneNumber || user.phone || "08000000000",
                 coordinates: savedAddress.coordinates,
             };
-            addressId = shippingAddress;
+            addressId = savedAddress._id || shippingAddress;
         } else if (
             orderData.addressId &&
             mongoose.Types.ObjectId.isValid(orderData.addressId)
         ) {
-            const savedAddress = user.addresses.id(orderData.addressId);
-            if (!savedAddress) throw new AppError("Address not found", 404);
+            const savedAddress =
+                user.addresses?.id?.(orderData.addressId) ||
+                user.addresses?.find(
+                    (a) => a._id?.toString() === orderData.addressId.toString(),
+                ) ||
+                user.addresses?.find((a) => a.isDefault) ||
+                user.addresses?.[0];
+
+            if (!savedAddress) {
+                throw new AppError(
+                    "Shipping address not found. Please add a shipping address.",
+                    404,
+                );
+            }
 
             finalShippingAddress = {
                 fullName: savedAddress.fullName || user.name || "Customer",
@@ -121,7 +145,7 @@ class PaymentService {
                 phoneNumber: savedAddress.phoneNumber || user.phoneNumber || user.phone || "08000000000",
                 coordinates: savedAddress.coordinates,
             };
-            addressId = orderData.addressId;
+            addressId = savedAddress._id || orderData.addressId;
         } else {
             const defaultAddress =
                 user.addresses?.find((a) => a.isDefault) || user.addresses?.[0];
@@ -148,8 +172,11 @@ class PaymentService {
         // Load cart
         const cart = await Cart.findOne({ user: userId });
 
-        if (!cart || cart.items.length === 0) {
-            throw new AppError("Cart is empty", 400);
+        if (!cart || !cart.items || cart.items.length === 0) {
+            throw new AppError(
+                "Cart is empty. Please add items to your cart before checking out.",
+                400,
+            );
         }
 
         // Fetch platform settings for global bonus promotions
@@ -472,8 +499,9 @@ class PaymentService {
         // Initialize provider transaction
         let init = null;
         if (provider === "paystack") {
+            const primaryId = (savedOrders[0]?._id || savedHolder._id).toString();
             const newAmount = paystackService.addFee(holderTotal);
-            const reference = paystackService.getReference();
+            const reference = `ABM_${primaryId}_${Date.now()}`;
             payment.reference = reference;
             await payment.save();
             try {
@@ -481,10 +509,21 @@ class PaymentService {
                     email: user.email,
                     amount: newAmount.customerPays,
                     reference,
-                    callback_url: callbackUrl || undefined,
+                    callback_url:
+                        callbackUrl ||
+                        `${process.env.FRONTEND_URL || "https://www.abamba.com.ng"}/cart/checkout?step=submitted`,
                     metadata: {
                         orderHolderId: savedHolder._id.toString(),
                         paymentId: payment._id.toString(),
+                        orderId: primaryId,
+                        userId: user._id.toString(),
+                        custom_fields: [
+                            {
+                                display_name: "Order ID",
+                                variable_name: "order_id",
+                                value: primaryId,
+                            },
+                        ],
                     },
                 });
             } catch (pErr) {
