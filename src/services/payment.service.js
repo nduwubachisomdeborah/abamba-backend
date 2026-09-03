@@ -189,12 +189,8 @@ class PaymentService {
         // Load cart
         let cart = await Cart.findOne({ user: userId });
 
-        // If cart is empty or missing, try to auto-populate from orderData.items (e.g. from frontend checkout)
-        if (
-            (!cart || !cart.items || cart.items.length === 0) &&
-            Array.isArray(orderData.items) &&
-            orderData.items.length > 0
-        ) {
+        // If frontend explicitly passes the current checkout items, always sync cart to only these items
+        if (Array.isArray(orderData.items) && orderData.items.length > 0) {
             if (!cart) {
                 cart = new Cart({
                     user: userId,
@@ -203,6 +199,8 @@ class PaymentService {
                     totalPrice: 0,
                 });
             }
+            // Clear any stale cart items from previous abandoned tests
+            cart.items = [];
             for (const itm of orderData.items) {
                 const prodId = itm.productId || itm.product || itm._id || itm.id;
                 if (prodId && mongoose.Types.ObjectId.isValid(prodId)) {
@@ -210,6 +208,7 @@ class PaymentService {
                     if (prodDoc) {
                         const qty = Math.max(1, Number(itm.quantity) || 1);
                         const unitPrice = Number(itm.price) || prodDoc.basePrice;
+                        const itemShipFee = Number(itm.shippingFee || itm.shipping?.amount || orderData.shippingFee || 3000);
                         cart.items.push({
                             product: prodDoc._id,
                             variant:
@@ -220,7 +219,7 @@ class PaymentService {
                             price: unitPrice,
                             total: unitPrice * qty,
                             shipping: {
-                                amount: Number(itm.shippingFee || itm.shipping?.amount || 0),
+                                amount: itemShipFee,
                             },
                         });
                     }
@@ -563,7 +562,10 @@ class PaymentService {
         let init = null;
         if (provider === "paystack") {
             const primaryId = (savedOrders[0]?._id || savedHolder._id).toString();
-            const newAmount = paystackService.addFee(holderTotal);
+            const passFee = process.env.PASS_PAYSTACK_FEE_TO_CUSTOMER === "true";
+            const newAmount = passFee
+                ? paystackService.addFee(holderTotal)
+                : { customerPays: holderTotal, merchantReceives: holderTotal, fee: 0 };
             const reference = `ABM_${primaryId}_${Date.now()}`;
             payment.reference = reference;
             await payment.save();
