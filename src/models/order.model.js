@@ -65,15 +65,18 @@ const addressSchema = new mongoose.Schema(
         },
         zipCode: {
             type: String,
-            required: true,
+            required: false,
+            default: "000000",
         },
         country: {
             type: String,
-            required: true,
+            required: false,
+            default: "NG",
         },
         phoneNumber: {
             type: String,
-            required: true,
+            required: false,
+            default: "0000000000",
         },
         coordinates: {
             type: {
@@ -98,14 +101,8 @@ const paymentSchema = new mongoose.Schema(
     {
         method: {
             type: String,
-            enum: [
-                "credit_card",
-                "paypal",
-                "bank_transfer",
-                "cash_on_delivery",
-                "other",
-            ],
-            required: true,
+            default: "bank_transfer",
+            required: false,
         },
         transactionId: {
             type: String,

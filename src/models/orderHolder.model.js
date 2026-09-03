@@ -57,19 +57,13 @@ const orderHolderSchema = new mongoose.Schema(
         },
         method: {
             type: String,
-            enum: [
-                "credit_card",
-                "paypal",
-                "bank_transfer",
-                "cash_on_delivery",
-                "other",
-            ],
-            required: true,
+            default: "bank_transfer",
+            required: false,
         },
         provider: {
             type: String,
-            enum: ["paystack", "funz", "manual", "other"],
             default: "paystack",
+            required: false,
         },
         subtotal: { type: Number, required: true },
         shippingCost: { type: Number, default: 0 },

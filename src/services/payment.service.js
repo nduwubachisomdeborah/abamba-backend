@@ -93,13 +93,13 @@ class PaymentService {
 
             finalShippingAddress = {
                 fullName: savedAddress.fullName || user.name || "Customer",
-                addressLine1: savedAddress.addressLine1,
-                addressLine2: savedAddress.addressLine2,
-                city: savedAddress.city,
-                state: savedAddress.state,
-                zipCode: savedAddress.zipCode,
-                country: savedAddress.country,
-                phoneNumber: savedAddress.phoneNumber || user.phoneNumber,
+                addressLine1: savedAddress.addressLine1 || "Delivery Address",
+                addressLine2: savedAddress.addressLine2 || "",
+                city: savedAddress.city || "City",
+                state: savedAddress.state || "State",
+                zipCode: savedAddress.zipCode || "460281",
+                country: savedAddress.country || "NG",
+                phoneNumber: savedAddress.phoneNumber || user.phoneNumber || user.phone || "08000000000",
                 coordinates: savedAddress.coordinates,
             };
             addressId = shippingAddress;
@@ -112,13 +112,13 @@ class PaymentService {
 
             finalShippingAddress = {
                 fullName: savedAddress.fullName || user.name || "Customer",
-                addressLine1: savedAddress.addressLine1,
-                addressLine2: savedAddress.addressLine2,
-                city: savedAddress.city,
-                state: savedAddress.state,
-                zipCode: savedAddress.zipCode,
-                country: savedAddress.country,
-                phoneNumber: savedAddress.phoneNumber || user.phoneNumber,
+                addressLine1: savedAddress.addressLine1 || "Delivery Address",
+                addressLine2: savedAddress.addressLine2 || "",
+                city: savedAddress.city || "City",
+                state: savedAddress.state || "State",
+                zipCode: savedAddress.zipCode || "460281",
+                country: savedAddress.country || "NG",
+                phoneNumber: savedAddress.phoneNumber || user.phoneNumber || user.phone || "08000000000",
                 coordinates: savedAddress.coordinates,
             };
             addressId = orderData.addressId;
@@ -133,13 +133,13 @@ class PaymentService {
             }
             finalShippingAddress = {
                 fullName: defaultAddress.fullName || user.name || "Customer",
-                addressLine1: defaultAddress.addressLine1,
-                addressLine2: defaultAddress.addressLine2,
-                city: defaultAddress.city,
-                state: defaultAddress.state,
-                zipCode: defaultAddress.zipCode,
-                country: defaultAddress.country,
-                phoneNumber: defaultAddress.phoneNumber || user.phoneNumber,
+                addressLine1: defaultAddress.addressLine1 || "Delivery Address",
+                addressLine2: defaultAddress.addressLine2 || "",
+                city: defaultAddress.city || "City",
+                state: defaultAddress.state || "State",
+                zipCode: defaultAddress.zipCode || "460281",
+                country: defaultAddress.country || "NG",
+                phoneNumber: defaultAddress.phoneNumber || user.phoneNumber || user.phone || "08000000000",
                 coordinates: defaultAddress.coordinates,
             };
             addressId = defaultAddress._id;
@@ -476,41 +476,59 @@ class PaymentService {
             const reference = paystackService.getReference();
             payment.reference = reference;
             await payment.save();
-            init = await paystackService.initializeTransaction({
-                email: user.email,
-                amount: newAmount.customerPays,
-                reference,
-                callback_url: callbackUrl || undefined,
-                metadata: {
-                    orderHolderId: savedHolder._id.toString(),
-                    paymentId: payment._id.toString(),
-                },
-            });
+            try {
+                init = await paystackService.initializeTransaction({
+                    email: user.email,
+                    amount: newAmount.customerPays,
+                    reference,
+                    callback_url: callbackUrl || undefined,
+                    metadata: {
+                        orderHolderId: savedHolder._id.toString(),
+                        paymentId: payment._id.toString(),
+                    },
+                });
+            } catch (pErr) {
+                const pMsg =
+                    pErr?.response?.data?.message ||
+                    pErr?.message ||
+                    "Paystack initialization failed";
+                console.error("[PaymentService] Paystack initialization error:", pMsg);
+                throw new AppError(pMsg, 400);
+            }
         } else if (provider === "funz") {
             const reference = funzService.getReference();
             payment.reference = reference;
             await payment.save();
-            const funzResult = await funzService.initializeTransaction({
-                email: user.email,
-                amount: holderTotal,
-                reference,
-                customerName: user.firstName
-                    ? `${user.firstName} ${user.lastName || ""}`.trim()
-                    : user.name || user.email,
-                phoneNumber: user.phoneNumber || user.phone || 0,
-                description: `Order #${savedHolder.orderId || savedHolder._id}`,
-                callbackUrl: callbackUrl || undefined,
-                metadata: [savedHolder._id.toString(), payment._id.toString()],
-            });
-            init = {
-                status: "success",
-                message: funzResult.message || "Authorization URL created",
-                data: {
-                    authorization_url: funzResult.payment_url,
-                    access_code: null,
+            try {
+                const funzResult = await funzService.initializeTransaction({
+                    email: user.email,
+                    amount: holderTotal,
                     reference,
-                },
-            };
+                    customerName: user.firstName
+                        ? `${user.firstName} ${user.lastName || ""}`.trim()
+                        : user.name || user.email,
+                    phoneNumber: user.phoneNumber || user.phone || 0,
+                    description: `Order #${savedHolder.orderId || savedHolder._id}`,
+                    callbackUrl: callbackUrl || undefined,
+                    metadata: [savedHolder._id.toString(), payment._id.toString()],
+                });
+                init = {
+                    status: "success",
+                    message: funzResult.message || "Authorization URL created",
+                    data: {
+                        authorization_url: funzResult.payment_url,
+                        access_code: null,
+                        reference,
+                    },
+                };
+            } catch (fErr) {
+                const fMsg =
+                    fErr?.response?.data?.message ||
+                    fErr?.message ||
+                    "Funz payment initialization failed";
+                console.error("[PaymentService] Funz initialization error:", fMsg);
+                throw new AppError(fMsg, 400);
+            }
         }
 
         // Do not clear cart or update inventory yet – wait for payment confirmation

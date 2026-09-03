@@ -51,12 +51,14 @@ export const errorHandler = (err, req, res, next) => {
     });
 
     // Send response
+    const clientMessage =
+        process.env.NODE_ENV === "production" && !err.isOperational && statusCode >= 500
+            ? "Something went wrong"
+            : err.message || "An error occurred";
+
     res.status(statusCode).json({
         success: false,
-        message:
-            process.env.NODE_ENV === "production"
-                ? "Something went wrong"
-                : err.message,
+        message: clientMessage,
         stack: process.env.NODE_ENV === "production" ? null : err.stack,
         data: {},
     });

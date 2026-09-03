@@ -60,30 +60,22 @@ const paymentDetailsSchema = Joi.object({}).pattern(
 
 // Schema for creating an order
 export const createOrderSchema = Joi.object({
-    shippingAddress: ObjectIdSchema.optional().messages({
-        "any.required": "Shipping address is required",
-    }),
-    paymentMethod: Joi.string()
-        .required()
-        .valid("credit_card", "bank_transfer", "cash_on_delivery", "other")
-        .messages({
-            "string.base": "Payment method must be a string",
-            "string.empty": "Payment method is required",
-            "any.only":
-                "Payment method must be one of: credit_card, bank_transfer, cash_on_delivery, other",
-            "any.required": "Payment method is required",
-        }),
-    provider: Joi.string()
+    shippingAddress: Joi.alternatives()
+        .try(ObjectIdSchema, addressSchema, Joi.object().unknown(true), Joi.string())
         .optional()
-        .valid("paystack", "funz")
-        .default("paystack")
         .messages({
-            "string.base": "Provider must be a string",
-            "string.empty": "Provider is required",
-            "any.only": "Provider must be one of: paystack, funz",
-            "any.required": "Provider is required",
+            "any.required": "Shipping address is required",
         }),
-    paymentDetails: paymentDetailsSchema,
+    addressId: Joi.string().allow("", null).optional(),
+    paymentMethod: Joi.string()
+        .allow("", null)
+        .default("bank_transfer")
+        .optional(),
+    provider: Joi.string()
+        .allow("", null)
+        .default("paystack")
+        .optional(),
+    paymentDetails: paymentDetailsSchema.optional(),
     notes: Joi.string().allow("").default("").max(500).optional().messages({
         "string.base": "Notes must be a string",
         "string.max": "Notes cannot exceed 500 characters",
@@ -93,7 +85,17 @@ export const createOrderSchema = Joi.object({
         "string.uri": "Callback URL must be a valid URL",
         "string.max": "Callback URL cannot exceed 500 characters",
     }),
-});
+    carrierId: Joi.string().allow("", null).optional(),
+    courierId: Joi.string().allow("", null).optional(),
+    courierName: Joi.string().allow("", null).optional(),
+    courierEmail: Joi.string().allow("", null).optional(),
+    logisticsEmail: Joi.string().allow("", null).optional(),
+    shippingFee: Joi.number().min(0).allow(null).optional(),
+    shippingCost: Joi.number().min(0).allow(null).optional(),
+    logisticsCompanyId: Joi.string().allow("", null).optional(),
+    companyId: Joi.string().allow("", null).optional(),
+    logisticsCompany: Joi.alternatives().try(Joi.string(), Joi.object().unknown(true)).optional(),
+}).unknown(true);
 
 // Schema for updating order status
 export const updateOrderStatusSchema = Joi.object({
