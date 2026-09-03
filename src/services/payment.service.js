@@ -514,7 +514,18 @@ class PaymentService {
         }
 
         // Do not clear cart or update inventory yet – wait for payment confirmation
+        const primaryOrder = savedOrders[0] || {};
+        const authUrl = init?.data?.authorization_url || null;
+        const accessCode = init?.data?.access_code || null;
+        const paymentRef = payment.reference || init?.data?.reference || null;
+
         return {
+            orderId: primaryOrder._id || savedHolder._id,
+            totalAmount: holderTotal,
+            total: holderTotal,
+            authorization_url: authUrl,
+            access_code: accessCode,
+            reference: paymentRef,
             orderHolder: savedHolder,
             orders: savedOrders,
             payment,
