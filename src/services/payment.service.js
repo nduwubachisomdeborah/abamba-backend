@@ -64,6 +64,23 @@ class PaymentService {
             callbackUrl,
         } = orderData;
 
+        let normalizedMethod = (paymentMethod || orderData.method || "credit_card")
+            .toLowerCase()
+            .trim();
+        if (normalizedMethod === "card" || normalizedMethod === "paystack") {
+            normalizedMethod = "credit_card";
+        }
+        if (
+            ![
+                "credit_card",
+                "bank_transfer",
+                "cash_on_delivery",
+                "other",
+            ].includes(normalizedMethod)
+        ) {
+            normalizedMethod = "credit_card";
+        }
+
         const user = await User.findById(userId);
         if (!user) throw new AppError("User not found", 404);
 
@@ -439,7 +456,7 @@ class PaymentService {
                       }
                     : undefined,
                 payment: {
-                    method: paymentMethod,
+                    method: normalizedMethod,
                     amount: total,
                     status: "pending",
                     details: {},
@@ -463,7 +480,7 @@ class PaymentService {
             payment: null,
             addressId: addressId || null,
             shippingAddress: finalShippingAddress,
-            method: paymentMethod,
+            method: normalizedMethod,
             provider,
             subtotal: holderSubtotal,
             shippingCost,
@@ -482,7 +499,7 @@ class PaymentService {
         // Create Payment document
         const payment = await Payment.create({
             provider,
-            method: paymentMethod,
+            method: normalizedMethod,
             amount: holderTotal,
             status: "pending",
             currency: process.env.CURRENCY || "NGN",
