@@ -16,7 +16,10 @@ router.patch('/:id', validateUpdateWishlist, WishlistController.updateWishlist);
 router.delete('/:id', WishlistController.deleteWishlist);
 
 // Product in wishlist routes
-router.post('/products', validateAddProduct, WishlistController.addProductToDefaultWishlist); // Add to default wishlist
+router.post('/products', validateAddProduct, WishlistController.addProductToDefaultWishlist);
+router.post('/toggle', validateAddProduct, WishlistController.addProductToDefaultWishlist);
+router.post('/products/:productId', WishlistController.addProductToDefaultWishlist);
+router.delete('/products/:productId', WishlistController.removeProductFromDefaultWishlist);
 router.post('/:id/products', validateAddProduct, WishlistController.addProductToWishlist);
 router.delete('/:id/products/:productId', WishlistController.removeProductFromWishlist);
 

@@ -19,33 +19,24 @@ const validateObjectId = (value, helpers) => {
 
 // Schema for creating a wishlist
 export const createWishlistSchema = Joi.object({
-  name: Joi.string().trim().max(50).messages({
-    'string.base': 'Name must be a string',
-    'string.max': 'Name cannot exceed 50 characters'
-  })
-});
+  name: Joi.string().trim().max(50).optional().allow(''),
+  productId: Joi.string().optional(),
+  id: Joi.string().optional(),
+  product: Joi.string().optional(),
+}).unknown(true);
 
 // Schema for updating a wishlist
 export const updateWishlistSchema = Joi.object({
-  name: Joi.string().trim().max(50).messages({
-    'string.base': 'Name must be a string',
-    'string.max': 'Name cannot exceed 50 characters'
-  })
-});
+  name: Joi.string().trim().max(50).optional(),
+}).unknown(true);
 
 // Schema for adding a product to a wishlist
 export const addProductSchema = Joi.object({
-  productId: Joi.string().custom(validateObjectId).required().messages({
-    'string.base': 'Product ID must be a string',
-    'string.empty': 'Product ID is required',
-    'any.invalid': 'Product ID must be a valid Object ID',
-    'any.required': 'Product ID is required'
-  }),
-  notes: Joi.string().trim().max(200).messages({
-    'string.base': 'Notes must be a string',
-    'string.max': 'Notes cannot exceed 200 characters'
-  })
-});
+  productId: Joi.string().optional(),
+  id: Joi.string().optional(),
+  product: Joi.string().optional(),
+  notes: Joi.string().trim().max(200).optional().allow(''),
+}).unknown(true);
 
 // Export a function to validate middleware
 export const validateCreateWishlist = (req, res, next) => {

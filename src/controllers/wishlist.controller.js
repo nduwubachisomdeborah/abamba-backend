@@ -26,11 +26,15 @@ class WishlistController {
   });
 
   /**
-   * @desc    Create a new wishlist
+   * @desc    Create a new wishlist or toggle product if productId passed
    * @route   POST /api/v1/wishlists
    * @access  Private
    */
   static createWishlist = asyncHandler(async (req, res) => {
+    const productId = req.body?.productId || req.body?.id || req.body?.product;
+    if (productId) {
+      return WishlistController.addProductToDefaultWishlist(req, res);
+    }
     const wishlist = await wishlistService.createWishlist(req.user.id, req.body);
     
     return successResponse(res, 'Wishlist created successfully', wishlist);
@@ -42,10 +46,11 @@ class WishlistController {
    * @access  Private
    */
   static addProductToWishlist = asyncHandler(async (req, res) => {
+    const productId = req.body?.productId || req.body?.id || req.body?.product;
     const wishlist = await wishlistService.addProductToWishlist(
       req.params.id,
       req.user.id,
-      req.body
+      { ...req.body, productId }
     );
     
     return successResponse(res, 'Product added to wishlist successfully', wishlist);
@@ -53,13 +58,27 @@ class WishlistController {
   
   /**
    * @desc    Toggle product in default wishlist (Add if absent, remove if present)
-   * @route   POST /api/v1/wishlists/products
+   * @route   POST /api/v1/wishlists/products, POST /api/v1/wishlists/toggle
    * @access  Private
    */
   static addProductToDefaultWishlist = asyncHandler(async (req, res) => {
+    const productId =
+      req.body?.productId ||
+      req.body?.id ||
+      req.body?.product ||
+      req.params?.productId;
+
+    if (!productId) {
+      return res.status(400).json({
+        status: "fail",
+        success: false,
+        message: "Product ID is required",
+      });
+    }
+
     const result = await wishlistService.toggleWishlistProduct(
       req.user.id,
-      req.body.productId
+      productId
     );
     
     return res.status(200).json({
@@ -73,6 +92,23 @@ class WishlistController {
         wishlist: result.wishlist
       }
     });
+  });
+
+  /**
+   * @desc    Remove product from default wishlist
+   * @route   DELETE /api/v1/wishlists/products/:productId
+   * @access  Private
+   */
+  static removeProductFromDefaultWishlist = asyncHandler(async (req, res) => {
+    const productId = req.params?.productId || req.body?.productId;
+    const defaultWishlist = await wishlistService.getOrCreateDefaultWishlist(req.user.id);
+    const wishlist = await wishlistService.removeProductFromWishlist(
+      defaultWishlist._id,
+      req.user.id,
+      productId
+    );
+    
+    return successResponse(res, 'Product removed from wishlist successfully', wishlist);
   });
 
   /**
