@@ -87,8 +87,9 @@ class CartService {
      * @returns {Promise<Object>} Updated cart
      */
     async addItem(userId, cartItemData) {
+        const itemData = cartItemData || {};
         const { productId, variantId, quantity, carrierId, request_token } =
-            cartItemData;
+            itemData;
 
         // Validate product exists and is not deleted
         const product = await Product.findOne({
@@ -102,14 +103,14 @@ class CartService {
 
         // Find the variant if provided
         let variant = null;
-        let price = product.basePrice;
+        let price = Number(product.basePrice) || 0;
 
         if (variantId) {
             variant = product.variants.id(variantId);
             if (!variant) {
                 throw new AppError("Variant not found", 404);
             }
-            price = variant.price;
+            price = Number(variant.price) || price;
 
             // Check variant stock
             if (variant.quantity < quantity) {
@@ -302,8 +303,8 @@ class CartService {
             const newItem = {
                 product: productId,
                 variant: variantId || null,
-                quantity,
-                price,
+                quantity: Math.max(1, Number(quantity) || 1),
+                price: Number(price) || 0,
                 shipping,
             };
 

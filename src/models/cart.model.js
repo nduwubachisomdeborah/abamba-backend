@@ -117,16 +117,23 @@ const cartSchema = new mongoose.Schema(
 cartSchema.pre("save", function (next) {
     if (this.items && this.items.length > 0) {
         this.totalItems = this.items.reduce(
-            (total, item) => total + item.quantity,
+            (total, item) => total + (Number(item.quantity) || 1),
             0
         );
         this.totalPrice = this.items.reduce(
-            (total, item) => total + item.price * item.quantity,
+            (total, item) =>
+                total + (Number(item.price) || 0) * (Number(item.quantity) || 1),
             0
         );
     } else {
         this.totalItems = 0;
         this.totalPrice = 0;
+    }
+    if (isNaN(this.totalPrice) || typeof this.totalPrice !== "number") {
+        this.totalPrice = 0;
+    }
+    if (isNaN(this.totalItems) || typeof this.totalItems !== "number") {
+        this.totalItems = 0;
     }
     this.lastUpdated = Date.now();
     next();

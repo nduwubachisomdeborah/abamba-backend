@@ -227,8 +227,10 @@ class PaymentService {
                 }
             }
             if (cart.items.length > 0) {
-                cart.totalItems = cart.items.reduce((sum, i) => sum + i.quantity, 0);
-                cart.totalPrice = cart.items.reduce((sum, i) => sum + i.total, 0);
+                cart.totalItems = cart.items.reduce((sum, i) => sum + (Number(i.quantity) || 1), 0);
+                cart.totalPrice = cart.items.reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+                if (isNaN(cart.totalPrice)) cart.totalPrice = 0;
+                if (isNaN(cart.totalItems)) cart.totalItems = 0;
                 await cart.save();
             }
         }
