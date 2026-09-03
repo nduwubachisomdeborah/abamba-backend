@@ -5,6 +5,18 @@ const itemShipmentSchema = new mongoose.Schema({
         type: Number,
         default: 3000,
     },
+    price: {
+        type: Number,
+        default: 3000,
+    },
+    total: {
+        type: Number,
+        default: 3000,
+    },
+    fee: {
+        type: Number,
+        default: 3000,
+    },
     service_code: {
         type: String,
         default: "richmond",
@@ -13,7 +25,19 @@ const itemShipmentSchema = new mongoose.Schema({
         type: String,
         default: "richmond",
     },
+    courier_id: {
+        type: String,
+        default: "richmond",
+    },
     carrierName: {
+        type: String,
+        default: "RichmondLogistics (Standard Delivery)",
+    },
+    courier_name: {
+        type: String,
+        default: "RichmondLogistics (Standard Delivery)",
+    },
+    name: {
         type: String,
         default: "RichmondLogistics",
     },

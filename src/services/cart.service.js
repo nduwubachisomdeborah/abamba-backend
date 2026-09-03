@@ -136,7 +136,69 @@ class CartService {
         }
 
         let shipping = null;
-        if (carrierId) {
+
+        // 1. If frontend passed a structured shipping object in itemData.shipping
+        if (itemData.shipping && typeof itemData.shipping === "object") {
+            const shipObj = itemData.shipping;
+            const carrierCode =
+                shipObj.carrierId ||
+                shipObj.courier_id ||
+                shipObj.code ||
+                carrierId ||
+                "richmond";
+            const carrierName =
+                shipObj.carrierName ||
+                shipObj.courier_name ||
+                shipObj.name ||
+                "RichmondLogistics (Standard Delivery)";
+            const fee =
+                Number(
+                    shipObj.amount ||
+                        shipObj.price ||
+                        shipObj.total ||
+                        shipObj.fee ||
+                        itemData.shippingFee ||
+                        3000,
+                ) || 3000;
+
+            shipping = {
+                amount: fee,
+                price: fee,
+                total: fee,
+                fee: fee,
+                service_code: shipObj.service_code || carrierCode || "regional",
+                carrierId: carrierCode,
+                courier_id: carrierCode,
+                carrierName: carrierName,
+                courier_name: carrierName,
+                name: carrierName,
+                carrierLogo: shipObj.carrierLogo || null,
+                request_token:
+                    shipObj.request_token || request_token || "REQ-REGIONAL",
+            };
+        } else if (
+            typeof itemData.shipping === "number" ||
+            typeof itemData.shippingFee === "number"
+        ) {
+            // Raw numeric shipping
+            const fee =
+                Number(itemData.shipping || itemData.shippingFee || 3000) || 3000;
+            const carrierCode = carrierId || "richmond";
+            shipping = {
+                amount: fee,
+                price: fee,
+                total: fee,
+                fee: fee,
+                service_code: carrierCode,
+                carrierId: carrierCode,
+                courier_id: carrierCode,
+                carrierName: "RichmondLogistics (Standard Delivery)",
+                courier_name: "RichmondLogistics (Standard Delivery)",
+                name: "RichmondLogistics",
+                carrierLogo: null,
+                request_token: request_token || "REQ-REGIONAL",
+            };
+        } else if (carrierId) {
             // First check cached ShippingOptions
             let shippingOption = null;
             if (request_token) {
@@ -147,17 +209,23 @@ class CartService {
 
             if (shippingOption && shippingOption.data?.couriers) {
                 const selectedCarrier = shippingOption.data.couriers.find(
-                    (carrier) => carrier.courier_id === carrierId
+                    (carrier) => carrier.courier_id === carrierId,
                 );
 
                 if (selectedCarrier) {
                     shipping = {
-                        amount: selectedCarrier.total,
+                        amount: selectedCarrier.total || 3000,
+                        price: selectedCarrier.total || 3000,
+                        total: selectedCarrier.total || 3000,
+                        fee: selectedCarrier.total || 3000,
                         service_code: selectedCarrier.service_code,
                         carrierId: selectedCarrier.courier_id,
+                        courier_id: selectedCarrier.courier_id,
                         carrierName: selectedCarrier.courier_name,
+                        courier_name: selectedCarrier.courier_name,
+                        name: selectedCarrier.courier_name,
                         carrierLogo: selectedCarrier.courier_image,
-                        request_token: request_token,
+                        request_token: request_token || "REQ-REGIONAL",
                     };
                 }
             }
@@ -178,24 +246,22 @@ class CartService {
                 if (company) {
                     shipping = {
                         amount: company.defaultBasePrice || 3000,
+                        price: company.defaultBasePrice || 3000,
+                        total: company.defaultBasePrice || 3000,
+                        fee: company.defaultBasePrice || 3000,
                         service_code: company.code || "regional",
                         carrierId: company.code || company._id.toString(),
+                        courier_id: company.code || company._id.toString(),
                         carrierName: `${company.name} (Standard Delivery)`,
-                        carrierLogo: null,
-                        request_token: request_token || "REQ-REGIONAL",
-                    };
-                } else {
-                    // Default regional fallback
-                    shipping = {
-                        amount: 3000,
-                        service_code: "richmond",
-                        carrierId: "richmond",
-                        carrierName: "Richmond Logistics (Standard Delivery)",
+                        courier_name: `${company.name} (Standard Delivery)`,
+                        name: company.name,
                         carrierLogo: null,
                         request_token: request_token || "REQ-REGIONAL",
                     };
                 }
             }
+        }
+
         if (!shipping) {
             shipping = {
                 amount: 3000,
