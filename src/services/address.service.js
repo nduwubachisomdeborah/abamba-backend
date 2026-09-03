@@ -64,7 +64,6 @@ class AddressService {
 
         // If this is the first address or if isDefault is true, set it as default
         if (user.addresses.length === 0 || addressData.isDefault) {
-            // If setting this address as default, unset any existing default
             if (user.addresses.length > 0) {
                 user.addresses.forEach((addr) => {
                     addr.isDefault = false;
@@ -73,49 +72,58 @@ class AddressService {
             addressData.isDefault = true;
         }
 
-        // format coordinates
-        addressData.coordinates = {
-            type: "Point",
-            coordinates: [
-                addressData.coordinates.longitude,
-                addressData.coordinates.latitude,
-            ],
-        };
+        // Format coordinates safely
+        if (
+            addressData.coordinates &&
+            addressData.coordinates.longitude !== undefined &&
+            addressData.coordinates.latitude !== undefined
+        ) {
+            addressData.coordinates = {
+                type: "Point",
+                coordinates: [
+                    Number(addressData.coordinates.longitude),
+                    Number(addressData.coordinates.latitude),
+                ],
+            };
+        } else {
+            addressData.coordinates = {
+                type: "Point",
+                coordinates: [7.0336, 5.4832], // Default coordinates
+            };
+        }
 
         // Add the new address
         user.addresses.push(addressData);
-
         await user.save();
 
         // Get the newly created address _id
         const newAddress = user.addresses[user.addresses.length - 1];
 
-        // Store the address validation with the address ID
+        // Attempt optional external validation without failing local save
         try {
-            const validatedAddress = await shipBubbleService.validateAddress({
+            await shipBubbleService.validateAddress({
                 userId,
                 addressId: newAddress._id,
-                name: addressData.fullName,
+                name: addressData.fullName || user.name || "Customer",
                 email: user.email,
                 phone: addressData.phoneNumber,
                 address: addressData.addressLine1,
                 longitude: addressData.coordinates.coordinates[0],
                 latitude: addressData.coordinates.coordinates[1],
             });
-
-            console.log({ validatedAddress });
         } catch (error) {
-            console.error("Address validation error:", error);
-
-            // Remove the invalid address from user
-            user.addresses.pull(newAddress._id);
-            await user.save();
-
-            // Throw the validation error
-            throw error;
+            console.warn("External address validation note:", error.message);
         }
 
-        return user;
+        return {
+            user,
+            address: newAddress,
+            addresses: user.addresses,
+            _id: newAddress._id,
+            ...(typeof newAddress.toObject === "function"
+                ? newAddress.toObject()
+                : newAddress),
+        };
     }
 
     /**

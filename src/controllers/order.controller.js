@@ -1,5 +1,6 @@
 import orderService from '../services/order.service.js';
 import paymentService from '../services/payment.service.js';
+import User from '../models/user.model.js';
 import { asyncHandler } from '../middlewares/error.js';
 import { successResponse } from '../utils/response.util.js';
 
@@ -10,6 +11,22 @@ class OrderController {
    * @access  Private
    */
   static createOrder = asyncHandler(async (req, res) => {
+    const shippingAddress = req.body.shippingAddress;
+    const addressId = req.body.addressId;
+
+    if (!shippingAddress && !addressId) {
+      // Check if user has a registered address in DB
+      const user = await User.findById(req.user.id);
+      const defaultAddr = user?.addresses?.find((a) => a.isDefault) || user?.addresses?.[0];
+      if (!defaultAddr) {
+        return res.status(400).json({
+          success: false,
+          message: "Shipping address is required to place an order.",
+        });
+      }
+      req.body.shippingAddress = defaultAddr;
+    }
+
     const order = await orderService.createOrder(req.user.id, req.body);
     
     return successResponse(res, 'Order created successfully', order);

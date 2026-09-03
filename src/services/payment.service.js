@@ -74,45 +74,72 @@ class PaymentService {
         let addressId;
 
         if (
+            typeof shippingAddress === "object" &&
+            shippingAddress !== null &&
+            !mongoose.Types.ObjectId.isValid(shippingAddress)
+        ) {
+            finalShippingAddress = shippingAddress;
+            addressId =
+                shippingAddress._id ||
+                shippingAddress.id ||
+                orderData.addressId ||
+                null;
+        } else if (
             shippingAddress &&
             mongoose.Types.ObjectId.isValid(shippingAddress)
         ) {
             const savedAddress = user.addresses.id(shippingAddress);
-
             if (!savedAddress) throw new AppError("Address not found", 404);
 
             finalShippingAddress = {
-                fullName: savedAddress.fullName,
+                fullName: savedAddress.fullName || user.name || "Customer",
                 addressLine1: savedAddress.addressLine1,
                 addressLine2: savedAddress.addressLine2,
                 city: savedAddress.city,
                 state: savedAddress.state,
                 zipCode: savedAddress.zipCode,
                 country: savedAddress.country,
-                phoneNumber: savedAddress.phoneNumber,
-                coordinates: [
-                    savedAddress.coordinates.longitude,
-                    savedAddress.coordinates.latitude,
-                ],
+                phoneNumber: savedAddress.phoneNumber || user.phoneNumber,
+                coordinates: savedAddress.coordinates,
             };
             addressId = shippingAddress;
-        } else if (!shippingAddress) {
-            const defaultAddress = user.addresses.find((a) => a.isDefault);
+        } else if (
+            orderData.addressId &&
+            mongoose.Types.ObjectId.isValid(orderData.addressId)
+        ) {
+            const savedAddress = user.addresses.id(orderData.addressId);
+            if (!savedAddress) throw new AppError("Address not found", 404);
+
+            finalShippingAddress = {
+                fullName: savedAddress.fullName || user.name || "Customer",
+                addressLine1: savedAddress.addressLine1,
+                addressLine2: savedAddress.addressLine2,
+                city: savedAddress.city,
+                state: savedAddress.state,
+                zipCode: savedAddress.zipCode,
+                country: savedAddress.country,
+                phoneNumber: savedAddress.phoneNumber || user.phoneNumber,
+                coordinates: savedAddress.coordinates,
+            };
+            addressId = orderData.addressId;
+        } else {
+            const defaultAddress =
+                user.addresses?.find((a) => a.isDefault) || user.addresses?.[0];
             if (!defaultAddress) {
                 throw new AppError(
-                    "No shipping address provided and no default address found",
+                    "Shipping address is required to place an order.",
                     400,
                 );
             }
             finalShippingAddress = {
-                fullName: defaultAddress.fullName,
+                fullName: defaultAddress.fullName || user.name || "Customer",
                 addressLine1: defaultAddress.addressLine1,
                 addressLine2: defaultAddress.addressLine2,
                 city: defaultAddress.city,
                 state: defaultAddress.state,
                 zipCode: defaultAddress.zipCode,
                 country: defaultAddress.country,
-                phoneNumber: defaultAddress.phoneNumber,
+                phoneNumber: defaultAddress.phoneNumber || user.phoneNumber,
                 coordinates: defaultAddress.coordinates,
             };
             addressId = defaultAddress._id;
@@ -241,9 +268,16 @@ class PaymentService {
         );
         const holderTotal = holderSubtotal + shippingCost;
 
+        // Check destination route
+        const destState = (finalShippingAddress?.state || "").toLowerCase().trim();
+        const destCity = (finalShippingAddress?.city || "").toLowerCase().trim();
+        const isAbiaRoute = destState.includes("abia") || destCity.includes("aba");
+
         // Check for assigned logistics company
         let assignedCompany = null;
         const requestedCarrier =
+            orderData.courierId ||
+            orderData.courierName ||
             orderData.carrierId ||
             orderData.carrier ||
             orderData.logisticsCompanyId ||
@@ -257,23 +291,83 @@ class PaymentService {
             if (!assignedCompany && typeof requestedCarrier === "string") {
                 assignedCompany = await LogisticsCompany.findOne({
                     $or: [
-                        { code: requestedCarrier.toLowerCase() },
-                        { name: new RegExp(requestedCarrier, "i") },
+                        { code: requestedCarrier.toLowerCase().trim() },
+                        { name: new RegExp(requestedCarrier.trim(), "i") },
+                        { email: requestedCarrier.toLowerCase().trim() },
                     ],
                 });
             }
         }
-        if (!assignedCompany && finalShippingAddress?.state) {
-            const state = finalShippingAddress.state
-                .toLowerCase()
-                .includes("abia")
-                ? "Abia"
-                : "Imo";
-            assignedCompany = await LogisticsCompany.findOne({
-                state,
-                active: true,
-            });
+
+        // Route verification & auto-correction:
+        if (isAbiaRoute) {
+            // Abia route: courier must be PrinceswiftLogistics or OkSaturdaylogistics
+            const isAbiaCourier =
+                assignedCompany &&
+                (assignedCompany.code === "princeswift" ||
+                    assignedCompany.code === "oksaturday" ||
+                    assignedCompany.name?.toLowerCase().includes("prince") ||
+                    assignedCompany.name?.toLowerCase().includes("saturday"));
+
+            if (!isAbiaCourier) {
+                // If Imo courier was submitted, auto-correct to PrinceswiftLogistics
+                assignedCompany = await LogisticsCompany.findOne({
+                    $or: [
+                        { code: "princeswift" },
+                        { name: "PrinceswiftLogistics" },
+                        { email: "chisomprince722@gmail.com" },
+                    ],
+                });
+                if (!assignedCompany) {
+                    assignedCompany = {
+                        _id: new mongoose.Types.ObjectId(),
+                        code: "princeswift",
+                        name: "PrinceswiftLogistics",
+                        email: "chisomprince722@gmail.com",
+                        state: "Abia",
+                        defaultBasePrice: 3000,
+                    };
+                }
+            }
+        } else {
+            // Imo route: courier must be RichmondLogistics, Apexgologisticservices, or HensLogistics
+            const isImoCourier =
+                assignedCompany &&
+                (assignedCompany.code === "richmond" ||
+                    assignedCompany.code === "apex" ||
+                    assignedCompany.code === "hens" ||
+                    assignedCompany.name?.toLowerCase().includes("richmond") ||
+                    assignedCompany.name?.toLowerCase().includes("apex") ||
+                    assignedCompany.name?.toLowerCase().includes("hens"));
+
+            if (!isImoCourier) {
+                // If Abia courier was submitted, auto-correct to RichmondLogistics
+                assignedCompany = await LogisticsCompany.findOne({
+                    $or: [
+                        { code: "richmond" },
+                        { name: "RichmondLogistics" },
+                        { email: "richmondoc2@gmail.com" },
+                    ],
+                });
+                if (!assignedCompany) {
+                    assignedCompany = {
+                        _id: new mongoose.Types.ObjectId(),
+                        code: "richmond",
+                        name: "RichmondLogistics",
+                        email: "richmondoc2@gmail.com",
+                        state: "Imo",
+                        defaultBasePrice: 3000,
+                    };
+                }
+            }
         }
+
+        const deliveryFee = Number(
+            orderData.shippingFee ||
+                orderData.shippingCost ||
+                assignedCompany?.defaultBasePrice ||
+                3000,
+        );
 
         // Create orders first
         const platformFeePercentage =
@@ -286,7 +380,7 @@ class PaymentService {
             );
             // allocate costs proportionally
             const share = holderSubtotal > 0 ? subtotal / holderSubtotal : 0;
-            const orderShipping = Number((shippingCost * share).toFixed(2));
+            const orderShipping = Number((shippingCost * share).toFixed(2)) || deliveryFee;
             // Calculate platform fee from seller order subtotal
             const platformFee = Number(
                 (subtotal * (platformFeePercentage / 100)).toFixed(2),
@@ -299,6 +393,12 @@ class PaymentService {
                 items: items.map(({ seller, ...rest }) => rest),
                 shippingAddress: finalShippingAddress,
                 addressId: addressId || null,
+                logistics: {
+                    courierId: assignedCompany.code || assignedCompany._id?.toString() || "courier",
+                    courierName: assignedCompany.name,
+                    courierEmail: assignedCompany.email,
+                    shippingFee: orderShipping || deliveryFee,
+                },
                 logisticsDispatch: assignedCompany
                     ? {
                           company: assignedCompany._id,
@@ -317,6 +417,7 @@ class PaymentService {
                     status: "pending",
                     details: {},
                 },
+                paymentStatus: "pending",
                 subtotal,
                 shippingCost: orderShipping,
                 platformFee,
@@ -468,12 +569,16 @@ class PaymentService {
         holder.status = "paid";
         await holder.save();
 
-        // Update all child orders to processing and set payment status
-        const orders = await Order.find({ _id: { $in: holder.orders } });
+        // Update all child orders to processing and set payment status to paid
+        const orders = await Order.find({ _id: { $in: holder.orders } })
+            .populate("seller", "name email business")
+            .populate("user", "name email phoneNumber");
+
         for (const order of orders) {
             order.status =
                 order.status === "pending" ? "processing" : order.status;
             order.payment.status = "completed";
+            order.paymentStatus = "paid";
             await order.save();
         }
 
@@ -483,55 +588,76 @@ class PaymentService {
                 let company = null;
                 if (order.logisticsDispatch?.company) {
                     company = await LogisticsCompany.findById(
-                        order.logisticsDispatch.company
+                        order.logisticsDispatch.company,
                     );
-                } else if (order.shippingAddress?.state) {
-                    const state = order.shippingAddress.state
-                        .toLowerCase()
-                        .includes("abia")
-                        ? "Abia"
-                        : "Imo";
+                }
+                if (!company && order.logistics?.courierEmail) {
                     company = await LogisticsCompany.findOne({
-                        state,
+                        email: order.logistics.courierEmail,
+                    });
+                }
+                if (!company && order.shippingAddress?.state) {
+                    const destState = (order.shippingAddress.state || "").toLowerCase();
+                    const destCity = (order.shippingAddress.city || "").toLowerCase();
+                    const isAbia = destState.includes("abia") || destCity.includes("aba");
+                    company = await LogisticsCompany.findOne({
+                        state: isAbia ? "Abia" : "Imo",
                         active: true,
                     });
                 }
 
-                if (company) {
-                    const fee = Number(
+                const courierEmail =
+                    order.logistics?.courierEmail || company?.email;
+                const courierName =
+                    order.logistics?.courierName || company?.name || "Logistics Partner";
+                const fee = Number(
+                    order.logistics?.shippingFee ||
                         order.logisticsDispatch?.deliveryFee ||
-                            order.shippingCost ||
-                            company.defaultBasePrice ||
-                            3000
-                    );
+                        order.shippingCost ||
+                        company?.defaultBasePrice ||
+                        3000,
+                );
 
-                    // Update company ledger
-                    await LogisticsCompany.findByIdAndUpdate(company._id, {
-                        $inc: {
-                            completedDeliveries: 1,
-                            totalEarned: fee,
-                            pendingPayout: fee,
-                        },
+                if (company || courierEmail) {
+                    // Update company ledger in DB if company record exists
+                    if (company?._id) {
+                        await LogisticsCompany.findByIdAndUpdate(company._id, {
+                            $inc: {
+                                completedDeliveries: 1,
+                                totalEarned: fee,
+                                pendingPayout: fee,
+                            },
+                        });
+                    }
+
+                    // Send dispatch notification email to the courier's official email
+                    await emailService.sendLogisticsDispatchEmail(order, company || {
+                        name: courierName,
+                        email: courierEmail,
+                        defaultBasePrice: fee,
                     });
 
-                    // Send dispatch email to company
-                    await emailService.sendLogisticsDispatchEmail(order, company);
-
-                    // Update order logisticsDispatch timestamp
+                    // Update order logistics and logisticsDispatch timestamps
                     order.logisticsDispatch = {
-                        company: company._id,
-                        companyName: company.name,
-                        companyEmail: company.email,
+                        company: company?._id || null,
+                        companyName: courierName,
+                        companyEmail: courierEmail,
                         deliveryFee: fee,
                         notifiedAt: new Date(),
                         status: "notified",
+                    };
+                    order.logistics = {
+                        courierId: company?.code || company?._id?.toString() || order.logistics?.courierId || "courier",
+                        courierName,
+                        courierEmail,
+                        shippingFee: fee,
                     };
                     await order.save();
                 }
             } catch (dispatchErr) {
                 console.error(
                     "Error processing logistics dispatch on order payment:",
-                    dispatchErr
+                    dispatchErr,
                 );
             }
         }

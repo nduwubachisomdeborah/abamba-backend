@@ -10,7 +10,9 @@ router.use(authenticate);
 
 // Cart routes
 router.get('/', CartController.getCart);
+router.get('/items', CartController.getCart);
 router.post('/', validateAddItem, CartController.addItem);
+router.post('/items', validateAddItem, CartController.addItem);
 router.patch('/items/:itemId', validateUpdateQuantity, CartController.updateItemQuantity);
 router.delete('/items/:itemId', CartController.removeItem);
 router.delete('/', CartController.clearCart);

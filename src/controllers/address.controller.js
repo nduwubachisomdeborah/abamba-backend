@@ -33,9 +33,16 @@ class AddressController {
    * @access  Private
    */
   static addAddress = asyncHandler(async (req, res) => {
-    const user = await addressService.addAddress(req.user.id, req.body);
+    const result = await addressService.addAddress(req.user.id, req.body);
+    const newAddress = result.address || result;
 
-    return successResponse(res, "Address added successfully", user.addresses);
+    return successResponse(res, "Address added successfully", {
+      address: newAddress,
+      addresses: result.addresses || (result.user && result.user.addresses) || [],
+      _id: newAddress._id,
+      id: newAddress._id,
+      ...(typeof newAddress.toObject === "function" ? newAddress.toObject() : newAddress)
+    });
   });
 
   /**

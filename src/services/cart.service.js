@@ -541,6 +541,7 @@ class CartService {
         result.items = enhancedItems;
         result.totalItems = totalItems;
         result.totalPrice = totalPrice;
+        result.subtotal = totalPrice;
 
         // Save only the essential cart data back to the database
         // This prevents loss of calculated fields that aren't part of the schema

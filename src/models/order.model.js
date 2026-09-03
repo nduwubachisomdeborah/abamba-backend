@@ -217,6 +217,17 @@ const orderSchema = new mongoose.Schema(
                 default: "notified",
             },
         },
+        logistics: {
+            courierId: { type: String, default: null },
+            courierName: { type: String, default: null },
+            courierEmail: { type: String, default: null },
+            shippingFee: { type: Number, default: 3000 },
+        },
+        paymentStatus: {
+            type: String,
+            enum: ["pending", "paid", "completed", "failed", "refunded"],
+            default: "pending",
+        },
         deleted: {
             type: Boolean,
             default: false,

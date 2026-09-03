@@ -85,37 +85,75 @@ class EmailService {
 
     async sendLogisticsDispatchEmail(order, company) {
         try {
-            const orderIdStr = order._id ? order._id.toString().slice(-6).toUpperCase() : "ORDER";
-            const deliveryFee = order.logisticsDispatch?.deliveryFee || order.shippingCost || company.defaultBasePrice || 3000;
+            const orderIdStr = order.orderId ? `${order.orderId}` : (order._id ? order._id.toString().slice(-6).toUpperCase() : "ORDER");
+            const recipientEmail = order.logistics?.courierEmail || company?.email;
+            const courierName = order.logistics?.courierName || company?.name || "Logistics Partner";
+            const deliveryFee = order.logistics?.shippingFee || order.logisticsDispatch?.deliveryFee || order.shippingCost || company?.defaultBasePrice || 3000;
+            
             const customerName = order.shippingAddress?.fullName || order.user?.name || "Valued Customer";
             const customerPhone = order.shippingAddress?.phoneNumber || order.user?.phoneNumber || "N/A";
             const addressLine = order.shippingAddress?.addressLine1 || "N/A";
+            const landmark = order.shippingAddress?.addressLine2 ? ` (Landmark: ${order.shippingAddress.addressLine2})` : "";
             const city = order.shippingAddress?.city || "";
-            const state = order.shippingAddress?.state || company.state || "";
+            const state = order.shippingAddress?.state || company?.state || "";
+
+            // Package Details
+            const itemsList = Array.isArray(order.items) && order.items.length > 0
+                ? order.items.map(item => `<li style="margin: 4px 0;"><strong>${item.name || "Product"}</strong> x ${item.quantity || 1}</li>`).join("")
+                : "<li>Standard Marketplace Package</li>";
+
+            // Seller Store / Pickup Location
+            const sellerName = order.seller?.business?.businessName || order.seller?.name || "Verified Abamba Merchant";
+            const pickupLocation = order.seller?.business?.storeAddress || order.seller?.business?.city || "Registered Store Location";
+
+            // Accept Delivery Action Link
+            const acceptDeliveryUrl = `${process.env.FRONTEND_URL || "https://abamba.store"}/delivery/accept/${order._id}?courier=${encodeURIComponent(courierName)}`;
 
             const htmlBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
-        <div style="background-color: #003459; padding: 20px; text-align: center; color: white;">
-          <h2 style="margin: 0;">📦 New Delivery Dispatch Request</h2>
-          <p style="margin: 5px 0 0; opacity: 0.85;">Abamba Marketplace Dispatch Notification</p>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+        <div style="background-color: #003459; padding: 24px; text-align: center; color: white;">
+          <h2 style="margin: 0; font-size: 22px;">📦 New Delivery Request - Order #${orderIdStr}</h2>
+          <p style="margin: 6px 0 0; opacity: 0.9; font-size: 14px;">Abamba Logistics Dispatch Service</p>
         </div>
         <div style="padding: 24px; color: #1f2937;">
-          <p style="font-size: 16px;">Hello <strong>${company.name}</strong> Team,</p>
-          <p>A customer has selected your service for delivery on Abamba. Below are the order and delivery details:</p>
-          <div style="background-color: #f8fafc; border-left: 4px solid #003459; padding: 16px; margin: 20px 0; border-radius: 4px;">
-            <p style="margin: 4px 0;"><strong>Order ID:</strong> #${orderIdStr}</p>
-            <p style="margin: 4px 0;"><strong>Delivery Fee:</strong> <span style="color: #003459; font-weight: bold; font-size: 16px;">₦${deliveryFee.toLocaleString()}</span></p>
+          <p style="font-size: 16px;">Hello <strong>${courierName}</strong> Team,</p>
+          <p>A customer has placed an order and selected your courier service for standard regional delivery. Please review the shipment details below:</p>
+          
+          <div style="background-color: #f8fafc; border-left: 4px solid #003459; padding: 16px; margin: 20px 0; border-radius: 6px;">
+            <p style="margin: 4px 0;"><strong>Order Number:</strong> #${orderIdStr}</p>
+            <p style="margin: 4px 0;"><strong>Delivery Fee:</strong> <span style="color: #003459; font-weight: bold; font-size: 17px;">₦${Number(deliveryFee).toLocaleString()}</span></p>
           </div>
-          <h4 style="color: #003459; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-top: 20px;">📍 Delivery Destination (Buyer):</h4>
-          <p style="margin: 4px 0;"><strong>Customer Name:</strong> ${customerName}</p>
-          <p style="margin: 4px 0;"><strong>Phone:</strong> ${customerPhone}</p>
-          <p style="margin: 4px 0;"><strong>Address:</strong> ${addressLine}${city ? `, ${city}` : ""}${state ? `, ${state}` : ""}</p>
-          <div style="margin-top: 30px; text-align: center;">
-            <a href="tel:${customerPhone !== "N/A" ? customerPhone : ''}" style="background-color: #003459; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
-              Call Customer for Delivery
+
+          <!-- Customer Details -->
+          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <h4 style="color: #003459; margin: 0 0 10px 0; border-bottom: 1px solid #edf2f7; padding-bottom: 6px;">📍 Customer Details (Delivery Destination):</h4>
+            <p style="margin: 4px 0;"><strong>Name:</strong> ${customerName}</p>
+            <p style="margin: 4px 0;"><strong>Phone:</strong> <a href="tel:${customerPhone !== "N/A" ? customerPhone : ''}" style="color: #003459; font-weight: bold;">${customerPhone}</a></p>
+            <p style="margin: 4px 0;"><strong>Full Delivery Address:</strong> ${addressLine}${landmark}, ${city}, ${state}</p>
+          </div>
+
+          <!-- Package Details -->
+          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <h4 style="color: #003459; margin: 0 0 10px 0; border-bottom: 1px solid #edf2f7; padding-bottom: 6px;">📦 Package Details:</h4>
+            <ul style="margin: 6px 0 12px 18px; padding: 0;">
+              ${itemsList}
+            </ul>
+            <p style="margin: 4px 0;"><strong>Seller Store:</strong> ${sellerName}</p>
+            <p style="margin: 4px 0;"><strong>Pickup Location:</strong> ${pickupLocation}</p>
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="margin: 30px 0 20px; text-align: center;">
+            <a href="${acceptDeliveryUrl}" style="background-color: #22c55e; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; margin-right: 10px; margin-bottom: 10px;">
+              ✅ Accept Delivery Request
             </a>
+            ${customerPhone !== "N/A" ? `
+            <a href="tel:${customerPhone}" style="background-color: #003459; color: white; padding: 14px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px; display: inline-block; margin-bottom: 10px;">
+              📞 Call Customer
+            </a>` : ''}
           </div>
-          <p style="font-size: 12px; color: #6b7280; margin-top: 30px; text-align: center;">
+
+          <p style="font-size: 12px; color: #64748b; margin-top: 24px; text-align: center; line-height: 1.5;">
             Delivery fees are recorded automatically and settled directly to your bank account at the end of the month by Abamba.
           </p>
         </div>
@@ -123,13 +161,13 @@ class EmailService {
     `;
 
             if (!this.plunk) {
-                console.log(`[Dispatch Email dev-mode] To: ${company.email}, Subject: New Delivery Dispatch #${orderIdStr}`);
+                console.log(`[Dispatch Email dev-mode] To: ${recipientEmail}, Subject: New Delivery Request - Order #${orderIdStr}`);
                 return { id: "dev-mode", status: "success" };
             }
 
             const emailData = {
-                to: company.email,
-                subject: `🚨 New Delivery Dispatch #${orderIdStr} (${company.state} State)`,
+                to: recipientEmail,
+                subject: `New Delivery Request - Order #${orderIdStr}`,
                 body: htmlBody,
             };
 
@@ -138,7 +176,7 @@ class EmailService {
             }
 
             const response = await this.plunk.emails.send(emailData);
-            console.log(`✅ Dispatch email sent to ${company.name} at ${company.email}`);
+            console.log(`✅ Dispatch email sent to ${courierName} at ${recipientEmail}`);
             return response;
         } catch (error) {
             console.error("Failed to send dispatch email via Plunk:", error);

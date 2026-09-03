@@ -22,6 +22,7 @@ router.use(authenticate); // All routes after this middleware require authentica
 
 // User routes (authenticated user can access)
 router.get("/me", UserController.getMe);
+router.get("/profile", UserController.getMe);
 router.put("/:id", validate(updateUserSchema), UserController.updateUser);
 router.patch(
     "/:id/disable",

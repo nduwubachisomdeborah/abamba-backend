@@ -8,22 +8,14 @@ const coordinatesSchema = Joi.object({
 
 // Schema for creating/updating an address
 export const addressSchema = Joi.object({
-    fullName: Joi.string().required().trim().max(100).messages({
-        "string.base": "Full name must be a string",
-        "string.empty": "Full name is required",
-        "string.max": "Full name cannot exceed 100 characters",
-        "any.required": "Full name is required",
-    }),
+    fullName: Joi.string().allow("", null).optional().trim().max(100).default("Customer"),
     addressLine1: Joi.string().required().trim().max(100).messages({
         "string.base": "Address line 1 must be a string",
         "string.empty": "Address line 1 is required",
         "string.max": "Address line 1 cannot exceed 100 characters",
         "any.required": "Address line 1 is required",
     }),
-    addressLine2: Joi.string().allow("").trim().max(100).messages({
-        "string.base": "Address line 2 must be a string",
-        "string.max": "Address line 2 cannot exceed 100 characters",
-    }),
+    addressLine2: Joi.string().allow("", null).optional().trim().max(100),
     city: Joi.string().required().trim().max(50).messages({
         "string.base": "City must be a string",
         "string.empty": "City is required",
@@ -36,28 +28,16 @@ export const addressSchema = Joi.object({
         "string.max": "State cannot exceed 50 characters",
         "any.required": "State is required",
     }),
-    zipCode: Joi.string().required().trim().max(20).messages({
-        "string.base": "Zip code must be a string",
-        "string.empty": "Zip code is required",
-        "string.max": "Zip code cannot exceed 20 characters",
-        "any.required": "Zip code is required",
-    }),
-    country: Joi.string().required().trim().max(50).messages({
-        "string.base": "Country must be a string",
-        "string.empty": "Country is required",
-        "string.max": "Country cannot exceed 50 characters",
-        "any.required": "Country is required",
-    }),
+    zipCode: Joi.string().allow("", null).optional().trim().max(20).default("460001"),
+    country: Joi.string().allow("", null).optional().trim().max(50).default("Nigeria"),
     phoneNumber: Joi.string().required().trim().max(20).messages({
         "string.base": "Phone number must be a string",
         "string.empty": "Phone number is required",
         "string.max": "Phone number cannot exceed 20 characters",
         "any.required": "Phone number is required",
     }),
-    isDefault: Joi.boolean().default(false).messages({
-        "boolean.base": "isDefault must be a boolean",
-    }),
-    coordinates: coordinatesSchema.optional(),
+    isDefault: Joi.boolean().default(false),
+    coordinates: coordinatesSchema.optional().allow(null),
 });
 
 // Schema for updating an address (all fields optional)
