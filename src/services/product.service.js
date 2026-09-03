@@ -2,6 +2,7 @@ import Product from "../models/product.model.js";
 import CategoryOption from "../models/categoryOptions.model.js";
 import Review from "../models/review.model.js";
 import User from "../models/user.model.js";
+import PlatformSettings from "../models/platformSettings.model.js";
 import { AppError } from "../middlewares/error.js";
 import PaginationUtil from "../utils/pagination.util.js";
 import reviewService from "./review.service.js";
@@ -389,8 +390,11 @@ class ProductService {
 
         // Process products to include additional data
         if (products.length > 0) {
+            const platformSettings = await PlatformSettings.getInstance();
+            const isBonusActive = Boolean(platformSettings?.isBonusEventActive);
+
             const processedProducts = products.map((product) => {
-                const productObj = product.toObject();
+                let productObj = product.toObject();
 
                 // Add unique variant attributes
                 productObj.variantAttributes =
@@ -401,6 +405,9 @@ class ProductService {
                     product.user?.business?.businessName ||
                     product.user?.name ||
                     "Vendor";
+
+                // Attach pricing, promotions, and bonus slashed pricing
+                productObj = processPromoInfo(productObj, isBonusActive);
 
                 return productObj;
             });
@@ -460,8 +467,11 @@ class ProductService {
             throw new AppError("Product not found", 404);
         }
 
+        const platformSettings = await PlatformSettings.getInstance();
+        const isBonusActive = Boolean(platformSettings?.isBonusEventActive);
+
         // Convert to object and process variant data
-        const productObj = product.toObject();
+        let productObj = product.toObject();
 
         // Convert variant attributes Maps to regular objects
         this._convertVariantAttributes(productObj);
@@ -475,6 +485,9 @@ class ProductService {
             product.user?.business?.businessName ||
             product.user?.name ||
             "Vendor";
+
+        // Attach pricing, promotions, and bonus slashed pricing
+        productObj = processPromoInfo(productObj, isBonusActive);
 
         // Include detailed rating statistics if requested
         if (includeRatingStats) {
@@ -626,8 +639,11 @@ class ProductService {
 
         // Process products to include additional data
         if (products.length > 0) {
+            const platformSettings = await PlatformSettings.getInstance();
+            const isBonusActive = Boolean(platformSettings?.isBonusEventActive);
+
             const processedProducts = products.map((product) => {
-                const productObj = product.toObject();
+                let productObj = product.toObject();
 
                 // Add unique variant attributes
                 productObj.variantAttributes =
@@ -638,6 +654,9 @@ class ProductService {
                     product.user?.business?.businessName ||
                     product.user?.name ||
                     "Vendor";
+
+                // Attach pricing, promotions, and bonus slashed pricing
+                productObj = processPromoInfo(productObj, isBonusActive);
 
                 return productObj;
             });
