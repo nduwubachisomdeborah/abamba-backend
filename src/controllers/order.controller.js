@@ -27,6 +27,8 @@ class OrderController {
       req.body.shippingAddress = defaultAddr;
     }
 
+    const result = await orderService.createOrder(req.user.id, req.body);
+
     const primaryOrderId =
       result.orderId ||
       result.orders?.[0]?._id ||
