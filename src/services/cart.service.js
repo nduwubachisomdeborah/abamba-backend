@@ -422,15 +422,33 @@ class CartService {
      * @returns {Promise<Object>} Empty cart
      */
     async clearCart(userId) {
-        const cart = await Cart.findOne({ user: userId });
+        let cart = await Cart.findOne({ user: userId });
         if (!cart) {
-            throw new AppError("Cart not found", 404);
+            cart = await this.createCart(userId);
         }
 
         cart.items = [];
+        cart.totalItems = 0;
+        cart.totalPrice = 0;
         await cart.save();
 
-        return cart;
+        return {
+            _id: cart._id,
+            user: userId,
+            items: [],
+            totalItems: 0,
+            totalPrice: 0,
+            subtotal: 0,
+            shippingCost: 0,
+            shippingFee: 0,
+            shippingTotal: 0,
+            shipping: 0,
+            estimatedTotal: 0,
+            total: 0,
+            selectedCourier: null,
+            courier: null,
+            count: 0,
+        };
     }
 
     /**
@@ -619,42 +637,46 @@ class CartService {
         let totalShippingFee = 0;
         let activeCourier = null;
 
-        enhancedItems.forEach((item) => {
-            const shipAmount =
-                item.shipping?.amount !== undefined &&
-                !isNaN(Number(item.shipping?.amount))
-                    ? Number(item.shipping.amount)
-                    : 3000;
-            totalShippingFee += shipAmount;
-            if (!activeCourier && item.shipping) {
-                activeCourier = item.shipping;
+        if (enhancedItems.length > 0) {
+            enhancedItems.forEach((item) => {
+                const shipAmount =
+                    item.shipping?.amount !== undefined &&
+                    !isNaN(Number(item.shipping?.amount))
+                        ? Number(item.shipping.amount)
+                        : 3000;
+                totalShippingFee += shipAmount;
+                if (!activeCourier && item.shipping) {
+                    activeCourier = item.shipping;
+                }
+            });
+
+            // Default to standard regional delivery (3000) if item shipping wasn't specified
+            if (totalShippingFee === 0) {
+                totalShippingFee = 3000;
             }
-        });
 
-        // Default to standard regional delivery (3000) if no items or fee
-        if (totalShippingFee === 0) {
-            totalShippingFee = 3000;
-        }
-
-        if (!activeCourier) {
-            activeCourier = {
-                amount: 3000,
-                price: 3000,
-                total: 3000,
-                fee: 3000,
-                service_code: "richmond",
-                carrierId: "richmond",
-                courier_id: "richmond",
-                carrierName: "RichmondLogistics",
-                courier_name: "RichmondLogistics",
-                name: "RichmondLogistics",
-                state: "Imo",
-                hub: "Owerri Hub",
-            };
+            if (!activeCourier) {
+                activeCourier = {
+                    amount: 3000,
+                    price: 3000,
+                    total: 3000,
+                    fee: 3000,
+                    service_code: "richmond",
+                    carrierId: "richmond",
+                    courier_id: "richmond",
+                    carrierName: "RichmondLogistics",
+                    courier_name: "RichmondLogistics",
+                    name: "RichmondLogistics",
+                    state: "Imo",
+                    hub: "Owerri Hub",
+                };
+            }
         }
 
         const estimatedTotal =
-            Number(totalPrice || 0) + Number(totalShippingFee || 3000);
+            enhancedItems.length > 0
+                ? Number(totalPrice || 0) + Number(totalShippingFee || 3000)
+                : 0;
 
         // Update cart totals in memory only
         const result = populatedCart.toObject();
