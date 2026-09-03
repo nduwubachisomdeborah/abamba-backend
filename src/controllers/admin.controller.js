@@ -126,9 +126,53 @@ class AdminController {
         return successResponse(res, "Orders retrieved successfully", data);
     });
 
+    static syncPendingPayments = asyncHandler(async (req, res) => {
+        const paymentService = (await import("../services/payment.service.js")).default;
+        await paymentService.reconcilePendingPayments();
+        return successResponse(res, "Pending payments synced successfully", null);
+    });
+
+    static getOrderStats = asyncHandler(async (req, res) => {
+        const data = await adminService.getOrderStats();
+        return successResponse(res, "Order statistics retrieved successfully", data);
+    });
+
     static getOrder = asyncHandler(async (req, res) => {
         const data = await adminService.getOrder(req.params.id);
         return successResponse(res, "Order retrieved successfully", data);
+    });
+
+    static markOrderDelivered = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const orderService = (await import("../services/order.service.js")).default;
+        const order = await orderService.updateOrderStatus(
+            id,
+            "delivered",
+            req.user._id,
+            "admin",
+        );
+        return successResponse(
+            res,
+            "Order marked as delivered and seller funds released successfully",
+            order,
+        );
+    });
+
+    static updateOrderStatus = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const { status } = req.body;
+        const orderService = (await import("../services/order.service.js")).default;
+        const order = await orderService.updateOrderStatus(
+            id,
+            status,
+            req.user._id,
+            "admin",
+        );
+        return successResponse(
+            res,
+            `Order status updated to ${status} successfully`,
+            order,
+        );
     });
 
     static suspendUser = asyncHandler(async (req, res) => {

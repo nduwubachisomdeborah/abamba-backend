@@ -1,5 +1,6 @@
 import User from "../models/user.model.js";
 import Order from "../models/order.model.js";
+import paymentService from "./payment.service.js";
 
 class AdminStatsService {
   /**
@@ -7,6 +8,9 @@ class AdminStatsService {
    * @returns {Promise<Object>} An object containing various statistics.
    */
   async getStats() {
+    // Auto-reconcile any pending Paystack transactions before computing statistics
+    await paymentService.reconcilePendingPayments().catch(() => {});
+
     // Total amount of payments for completed payments (paid orders)
     const paidMatch = {
       deleted: { $ne: true },

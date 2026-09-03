@@ -1,4 +1,5 @@
 import Order from "../models/order.model.js";
+import User from "../models/user.model.js";
 import Cart from "../models/cart.model.js";
 import Product from "../models/product.model.js";
 import { AppError } from "../middlewares/error.js";
@@ -204,8 +205,9 @@ class OrderService {
 
         // Validate status transition
         const validTransitions = {
-            pending: ["processing", "cancelled"],
-            processing: ["shipped", "cancelled"],
+            pending: ["paid", "processing", "cancelled"],
+            processing: ["paid", "shipped", "delivered", "cancelled"],
+            paid: ["processing", "shipped", "delivered", "cancelled"],
             shipped: ["delivered", "returned"],
             delivered: ["returned", "refunded"],
             cancelled: ["refunded"],
@@ -221,6 +223,25 @@ class OrderService {
 
         order.status = status;
 
+        // If order is delivered, release funds from pending to available seller wallet balance
+        if (status === "delivered" && order.sellerWalletStatus === "pending") {
+            const creditAmount = Number(order.subtotal || 0);
+            if (order.seller && creditAmount > 0) {
+                await User.findByIdAndUpdate(order.seller, {
+                    $inc: {
+                        "wallet.balance": creditAmount,
+                        "wallet.pendingBalance": -creditAmount,
+                    },
+                });
+                order.sellerWalletStatus = "paid";
+                await notificationService.send(
+                    order.seller,
+                    "Funds Released",
+                    `Order #${order.orderId || order._id} has been delivered. **₦${creditAmount.toLocaleString()}** is now available for withdrawal.`,
+                );
+            }
+        }
+
         // If order is cancelled or refunded, handle payment status
         if (status === "cancelled" || status === "refunded") {
             order.payment.status =
@@ -232,8 +253,9 @@ class OrderService {
         // Notify customer of order status change
         const statusMessages = {
             processing: "Your order is now being processed.",
+            paid: "Your payment has been received and your order is confirmed.",
             shipped: "Your order has been shipped and is on its way!",
-            delivered: "Your order has been delivered. Enjoy!",
+            delivered: `Your order #${order.orderId || order._id} has been delivered. Enjoy!`,
             cancelled: "Your order has been cancelled.",
             returned: "Your order return has been initiated.",
             refunded: "Your order has been refunded.",
@@ -242,7 +264,7 @@ class OrderService {
         if (msg) {
             await notificationService.send(
                 order.user,
-                `Order #${order.orderNumber || orderId} update`,
+                `Order #${order.orderNumber || order.orderId || orderId} update`,
                 msg
             );
         }

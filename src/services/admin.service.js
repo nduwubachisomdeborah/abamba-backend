@@ -6,6 +6,7 @@ import Order from "../models/order.model.js";
 import Product from "../models/product.model.js";
 import PlatformSettings from "../models/platformSettings.model.js";
 import notificationService from "./notification.service.js";
+import paymentService from "./payment.service.js";
 
 class AdminService {
     async login(email, password) {
@@ -367,6 +368,9 @@ class AdminService {
     }
 
     async getAllOrders(options = {}) {
+        // Auto-reconcile any pending Paystack payments before listing orders
+        await paymentService.reconcilePendingPayments().catch(() => {});
+
         const { page = 1, limit = 10, search = "", status } = options;
 
         const pageNumber = parseInt(page);
@@ -398,7 +402,7 @@ class AdminService {
                 $addFields: {
                     sortPriority: {
                         $cond: {
-                            if: { $eq: ["$status", "processing"] },
+                            if: { $in: ["$status", ["paid", "processing"]] },
                             then: 0,
                             else: 1,
                         },
@@ -431,14 +435,134 @@ class AdminService {
             },
         ];
 
-        const orders = await Order.aggregate(aggregation);
-        const totalOrders = await Order.countDocuments(query);
+        const [
+            orders,
+            totalFiltered,
+            totalOrders,
+            processingOrders,
+            completedOrders,
+            cancelledOrders,
+            pendingOrders,
+            paidOrders,
+        ] = await Promise.all([
+            Order.aggregate(aggregation),
+            Order.countDocuments(query),
+            Order.countDocuments({ deleted: { $ne: true } }),
+            Order.countDocuments({
+                deleted: { $ne: true },
+                status: { $in: ["paid", "processing"] },
+            }),
+            Order.countDocuments({
+                deleted: { $ne: true },
+                status: { $in: ["completed", "delivered"] },
+            }),
+            Order.countDocuments({
+                deleted: { $ne: true },
+                status: "cancelled",
+            }),
+            Order.countDocuments({
+                deleted: { $ne: true },
+                status: "pending",
+            }),
+            Order.countDocuments({
+                deleted: { $ne: true },
+                status: "paid",
+            }),
+        ]);
 
         return {
             orders,
-            totalPages: Math.ceil(totalOrders / limitNumber),
+            totalPages: Math.ceil(totalFiltered / limitNumber),
             currentPage: pageNumber,
             totalOrders,
+            total: totalOrders,
+            // Status counts for Orders page cards
+            processing: processingOrders,
+            completed: completedOrders,
+            cancelled: cancelledOrders,
+            pending: pendingOrders,
+            processingOrders,
+            completedOrders,
+            cancelledOrders,
+            pendingOrders,
+            totalProcessing: processingOrders,
+            totalCompleted: completedOrders,
+            totalCancelled: cancelledOrders,
+            totalPending: pendingOrders,
+            processingCount: processingOrders,
+            completedCount: completedOrders,
+            cancelledCount: cancelledOrders,
+            counts: {
+                totalOrders,
+                total: totalOrders,
+                processing: processingOrders,
+                completed: completedOrders,
+                cancelled: cancelledOrders,
+                pending: pendingOrders,
+            },
+            stats: {
+                totalOrders,
+                total: totalOrders,
+                processing: processingOrders,
+                completed: completedOrders,
+                cancelled: cancelledOrders,
+                pending: pendingOrders,
+            },
+        };
+    }
+
+    async getOrderStats() {
+        const [
+            totalOrders,
+            processingOrders,
+            completedOrders,
+            cancelledOrders,
+            pendingOrders,
+        ] = await Promise.all([
+            Order.countDocuments({ deleted: { $ne: true } }),
+            Order.countDocuments({
+                deleted: { $ne: true },
+                status: { $in: ["paid", "processing"] },
+            }),
+            Order.countDocuments({
+                deleted: { $ne: true },
+                status: { $in: ["completed", "delivered"] },
+            }),
+            Order.countDocuments({ deleted: { $ne: true }, status: "cancelled" }),
+            Order.countDocuments({ deleted: { $ne: true }, status: "pending" }),
+        ]);
+
+        return {
+            totalOrders,
+            total: totalOrders,
+            processing: processingOrders,
+            processingOrders,
+            completed: completedOrders,
+            completedOrders,
+            cancelled: cancelledOrders,
+            cancelledOrders,
+            pending: pendingOrders,
+            pendingOrders,
+            totalProcessing: processingOrders,
+            totalCompleted: completedOrders,
+            totalCancelled: cancelledOrders,
+            processingCount: processingOrders,
+            completedCount: completedOrders,
+            cancelledCount: cancelledOrders,
+            counts: {
+                totalOrders,
+                processing: processingOrders,
+                completed: completedOrders,
+                cancelled: cancelledOrders,
+                pending: pendingOrders,
+            },
+            stats: {
+                totalOrders,
+                processing: processingOrders,
+                completed: completedOrders,
+                cancelled: cancelledOrders,
+                pending: pendingOrders,
+            },
         };
     }
 
@@ -462,6 +586,20 @@ class AdminService {
 
         if (!order) {
             throw new AppError("Order not found", 404);
+        }
+
+        if (order.status === "pending" || order.paymentStatus === "pending") {
+            await paymentService.reconcilePendingPayments().catch(() => {});
+            // Reload order if reconciled
+            order = isNumeric
+                ? await Order.findOne({ orderId: Number(orderId) })
+                      .populate("user", "name email phoneNumber")
+                      .populate("shipment")
+                      .populate("seller", "name email business")
+                : await Order.findById(orderId)
+                      .populate("user", "name email phoneNumber")
+                      .populate("shipment")
+                      .populate("seller", "name email business");
         }
 
         return order;

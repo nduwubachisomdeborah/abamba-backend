@@ -108,6 +108,7 @@ export const updateOrderStatusSchema = Joi.object({
         .required()
         .valid(
             "pending",
+            "paid",
             "processing",
             "shipped",
             "delivered",
@@ -118,7 +119,7 @@ export const updateOrderStatusSchema = Joi.object({
             "string.base": "Status must be a string",
             "string.empty": "Status is required",
             "any.only":
-                "Status must be one of: pending, processing, shipped, delivered, cancelled, refunded",
+                "Status must be one of: pending, paid, processing, shipped, delivered, cancelled, refunded",
             "any.required": "Status is required",
         }),
 });

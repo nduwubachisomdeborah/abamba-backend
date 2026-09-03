@@ -181,7 +181,31 @@ router.get(
 );
 
 router.get("/orders", authenticate, adminOnly, AdminController.getAllOrders);
+router.get(
+    "/orders/stats",
+    authenticate,
+    adminOnly,
+    AdminController.getOrderStats,
+);
+router.post(
+    "/orders/sync-pending",
+    authenticate,
+    adminOnly,
+    AdminController.syncPendingPayments,
+);
 router.get("/orders/:id", authenticate, adminOnly, AdminController.getOrder);
+router.patch(
+    "/orders/:id/deliver",
+    authenticate,
+    adminOnly,
+    AdminController.markOrderDelivered,
+);
+router.patch(
+    "/orders/:id/status",
+    authenticate,
+    adminOnly,
+    AdminController.updateOrderStatus,
+);
 
 // FAQ management routes
 router.get("/faqs", authenticate, adminOnly, FaqController.getAllFaqs);

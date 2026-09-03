@@ -20,6 +20,7 @@ import { initializeCategoryOptions } from "./scripts/initializeCategoryOptions.j
 import { initializeAdminUser } from "./scripts/initializeAdmin.js";
 import { syncCouriers } from "./scripts/syncCouriers.js";
 import { seedLogisticsCompanies } from "./scripts/seedLogistics.js";
+import paymentService from "./services/payment.service.js";
 
 // Import error middleware
 import { errorHandler } from "./middlewares/error.js";
@@ -99,8 +100,17 @@ const mongooseOptions = {
     family: 4, // IPv4 lookup for faster DNS
 };
 
+// Fallback to MongoDB Atlas if local URI points to unresolvable Docker hostname
+const ATLAS_FALLBACK_URI =
+    "mongodb+srv://deborahchisom033_db_user:0ynecEkLv2ImlVqz@cluster0.xplxdhx.mongodb.net/abamba";
+
+let connectionUri = process.env.MONGODB_URI || ATLAS_FALLBACK_URI;
+if (connectionUri.includes("@mongo:") || connectionUri.includes("//mongo:")) {
+    connectionUri = ATLAS_FALLBACK_URI;
+}
+
 // Ensure MongoDB SRV records resolve reliably across Windows and cloud networks
-if (process.env.MONGODB_URI && process.env.MONGODB_URI.startsWith("mongodb+srv")) {
+if (connectionUri.startsWith("mongodb+srv")) {
     try {
         dns.setServers(["8.8.8.8", "1.1.1.1"]);
     } catch (dnsErr) {
@@ -109,7 +119,7 @@ if (process.env.MONGODB_URI && process.env.MONGODB_URI.startsWith("mongodb+srv")
 }
 
 mongoose
-    .connect(process.env.MONGODB_URI, mongooseOptions)
+    .connect(connectionUri, mongooseOptions)
     .then((mon) => {
         console.log("✅ Connected to MongoDB with Connection Pool (maxPoolSize: 50)");
         // Initialize category options after database connection
@@ -121,6 +131,14 @@ mongoose
         syncCouriers();
         // Seed Regional Logistics Companies
         seedLogisticsCompanies();
+        // Auto-reconcile any pending Paystack payments on boot
+        paymentService.reconcilePendingPayments().catch((err) =>
+            console.error("Reconcile on boot error:", err?.message)
+        );
+        // Continuously reconcile pending payments every 45 seconds in background
+        setInterval(() => {
+            paymentService.reconcilePendingPayments().catch(() => {});
+        }, 45 * 1000);
     })
     .catch((err) => console.error("Could not connect to MongoDB", err));
 

@@ -42,7 +42,9 @@ class PaymentController {
 
             // Only proceed for charge.success
             const event = payload?.event;
-            const reference = payload?.data?.reference;
+            const reference = payload?.data?.reference || payload?.reference;
+
+            console.log("[PaystackWebhook] Received:", { event, reference });
 
             if (!reference) {
                 return res
@@ -60,9 +62,9 @@ class PaymentController {
                 event,
                 reference,
                 data: {
-                    paymentId: result.payment._id,
-                    orderHolderId: result.orderHolder._id,
-                    orders: result.orders.map((o) => o._id),
+                    paymentId: result.payment?._id,
+                    orderHolderId: result.orderHolder?._id,
+                    orders: result.orders?.map((o) => o._id) || [],
                 },
             });
         } catch (err) {

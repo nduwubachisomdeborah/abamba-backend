@@ -681,10 +681,32 @@ class PaymentService {
 
         // Idempotency guard: Paystack webhooks can be delivered more than once.
         // If we've already completed this payment, avoid re-crediting seller wallets.
+        let holder = await OrderHolder.findOne({ payment: payment._id });
+        if (!holder && payment.metadata?.orderHolderId) {
+            holder = await OrderHolder.findById(payment.metadata.orderHolderId);
+        }
+
+        let orders = [];
+        if (holder && holder.orders && holder.orders.length > 0) {
+            orders = await Order.find({ _id: { $in: holder.orders } })
+                .populate("seller", "name email business")
+                .populate("user", "name email phoneNumber");
+        }
+        if (orders.length === 0 && holder?._id) {
+            orders = await Order.find({ orderHolder: holder._id })
+                .populate("seller", "name email business")
+                .populate("user", "name email phoneNumber");
+        }
+        if (orders.length === 0) {
+            const match = reference.match(/^ABM_([0-9a-fA-F]{24})/);
+            if (match) {
+                orders = await Order.find({ _id: match[1] })
+                    .populate("seller", "name email business")
+                    .populate("user", "name email phoneNumber");
+            }
+        }
+
         if (payment.status === "completed") {
-            const holder = await OrderHolder.findOne({ payment: payment._id });
-            if (!holder) throw new AppError("Order holder not found", 404);
-            const orders = await Order.find({ _id: { $in: holder.orders } });
             return { payment, orderHolder: holder, orders };
         }
 
@@ -696,20 +718,14 @@ class PaymentService {
         payment.details = verifiedData;
         await payment.save();
 
-        const holder = await OrderHolder.findOne({ payment: payment._id });
-        if (!holder) throw new AppError("Order holder not found", 404);
+        if (holder) {
+            holder.status = "paid";
+            await holder.save();
+        }
 
-        holder.status = "paid";
-        await holder.save();
-
-        // Update all child orders to processing and set payment status to paid
-        const orders = await Order.find({ _id: { $in: holder.orders } })
-            .populate("seller", "name email business")
-            .populate("user", "name email phoneNumber");
-
+        // Update all child orders to paid and set payment status to paid
         for (const order of orders) {
-            order.status =
-                order.status === "pending" ? "processing" : order.status;
+            order.status = "paid";
             order.payment.status = "completed";
             order.paymentStatus = "paid";
             await order.save();
@@ -840,26 +856,102 @@ class PaymentService {
         );
 
         // Clear cart
-        await Cart.findOneAndUpdate(
-            { user: holder.user },
-            {
-                $set: {
-                    items: [],
-                    totalItems: 0,
-                    totalPrice: 0,
-                    lastUpdated: Date.now(),
+        const userIdToClear = holder?.user || payment.metadata?.userId || orders[0]?.user?._id || orders[0]?.user;
+        if (userIdToClear) {
+            await Cart.findOneAndUpdate(
+                { user: userIdToClear },
+                {
+                    $set: {
+                        items: [],
+                        totalItems: 0,
+                        totalPrice: 0,
+                        lastUpdated: Date.now(),
+                    },
                 },
-            },
-        );
+            );
 
-        // Notify customer of successful payment
-        await notificationService.send(
-            holder.user,
-            "Payment successful!",
-            `Your payment of **₦${payment.amount.toLocaleString()}** was successful. Your order is now being processed.`,
-        );
+            // Notify customer of successful payment
+            await notificationService.send(
+                userIdToClear,
+                "Payment successful!",
+                `Your payment of **₦${payment.amount.toLocaleString()}** was successful. Your order is now being processed.`,
+            );
+        }
 
         return { payment, orderHolder: holder, orders };
+    }
+
+    async reconcilePendingPayments() {
+        try {
+            // Find recent pending payments created in the last 7 days
+            const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            const pendingPayments = await Payment.find({
+                status: "pending",
+                provider: "paystack",
+                reference: { $exists: true, $ne: null },
+                createdAt: { $gte: since },
+            })
+                .sort({ createdAt: -1 })
+                .limit(20);
+
+            for (const p of pendingPayments) {
+                try {
+                    const verification = await paystackService.verifyTransaction(p.reference);
+                    if (verification?.data?.status === "success") {
+                        console.log(`[PaymentService] Auto-reconciled Paystack payment: ${p.reference}`);
+                        await this.verifyAndFinalizeByReference(p.reference);
+                    }
+                } catch (pErr) {
+                    // Not paid or still pending on Paystack
+                }
+            }
+
+            // Also check for any orders with paymentStatus === "pending"
+            const pendingOrders = await Order.find({
+                deleted: { $ne: true },
+                paymentStatus: "pending",
+                status: "pending",
+                createdAt: { $gte: since },
+            })
+                .sort({ createdAt: -1 })
+                .limit(20);
+
+            for (const ord of pendingOrders) {
+                const ordPayment = await Payment.findOne({
+                    $or: [
+                        { "metadata.orderId": ord._id.toString() },
+                        { reference: { $regex: ord._id.toString() } },
+                    ],
+                    status: "pending",
+                });
+                if (ordPayment && ordPayment.reference) {
+                    try {
+                        const verification = await paystackService.verifyTransaction(ordPayment.reference);
+                        if (verification?.data?.status === "success") {
+                            console.log(`[PaymentService] Auto-reconciled pending order #${ord.orderNumber || ord._id} via payment ${ordPayment.reference}`);
+                            await this.verifyAndFinalizeByReference(ordPayment.reference);
+                        }
+                    } catch (pErr) {
+                        // ignore
+                    }
+                }
+            }
+
+            // Ensure all paid orders have status marked as "paid"
+            await Order.updateMany(
+                {
+                    deleted: { $ne: true },
+                    $or: [
+                        { paymentStatus: "paid" },
+                        { "payment.status": "completed" },
+                    ],
+                    status: { $in: ["processing", "pending"] },
+                },
+                { $set: { status: "paid" } },
+            );
+        } catch (err) {
+            console.error("[PaymentService] Error during reconcilePendingPayments:", err?.message || err);
+        }
     }
 
     async getPaymentStatus(reference) {
