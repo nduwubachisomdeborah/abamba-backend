@@ -71,6 +71,10 @@ export const createOrderSchema = Joi.object({
         .allow("", null)
         .default("bank_transfer")
         .optional(),
+    method: Joi.string()
+        .allow("", null)
+        .default("bank_transfer")
+        .optional(),
     provider: Joi.string()
         .allow("", null)
         .default("paystack")
