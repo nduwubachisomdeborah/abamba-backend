@@ -59,9 +59,9 @@ class AdminStatsService {
       },
     ]);
 
-    // User and seller counts (exclude soft-deleted)
+    // User and seller counts (exclude soft-deleted and temporary guests)
     const [usersCount, sellersCount] = await Promise.all([
-      User.countDocuments({ role: "user", deleted: { $ne: true } }),
+      User.countDocuments({ role: "user", deleted: { $ne: true }, isGuest: { $ne: true } }),
       User.countDocuments({ role: "seller", deleted: { $ne: true } }),
     ]);
 
@@ -159,11 +159,13 @@ class AdminStatsService {
     ] = await Promise.all([
       User.countDocuments({
         deleted: { $ne: true },
+        isGuest: { $ne: true },
         role: { $in: ["user", "customer"] },
         "addresses.state": { $regex: /imo/i },
       }),
       User.countDocuments({
         deleted: { $ne: true },
+        isGuest: { $ne: true },
         role: { $in: ["user", "customer"] },
         "addresses.state": { $regex: /abia/i },
       }),
