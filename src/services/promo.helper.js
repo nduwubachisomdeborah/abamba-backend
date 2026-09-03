@@ -30,6 +30,20 @@ export const processPromoInfo = (productObj, isBonusActive = true) => {
     productObj.slashedPrice = null;
     productObj.formattedBasePrice = `₦${basePrice.toLocaleString()}`;
 
+    // Guarantee non-empty image fields across all product endpoints
+    const primaryImg =
+        (productObj.images && productObj.images[0]?.url) ||
+        (typeof productObj.images?.[0] === "string"
+            ? productObj.images[0]
+            : null) ||
+        productObj.image ||
+        "https://abamba.store/placeholder.png";
+
+    productObj.image = primaryImg;
+    productObj.primaryImage = primaryImg;
+    productObj.selectedImage = primaryImg;
+    productObj.thumbnail = primaryImg;
+
     const hasValidBonus =
         bonusPrice !== null && bonusPrice > 0 && bonusPrice < basePrice;
     const isPromoActive = Boolean(productObj.promoActive || productObj.onSale);
