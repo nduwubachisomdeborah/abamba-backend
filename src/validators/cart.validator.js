@@ -28,23 +28,14 @@ export const addItemSchema = Joi.object({
         .messages({
             "string.objectId": "Invalid variant ID format",
         }),
-    quantity: Joi.number().integer().min(1).required().messages({
+    quantity: Joi.number().integer().min(1).default(1).optional().messages({
         "number.base": "Quantity must be a number",
         "number.integer": "Quantity must be an integer",
         "number.min": "Quantity must be at least 1",
-        "any.required": "Quantity is required",
     }),
-    carrierId: Joi.string().required().messages({
-        "string.base": "Carrier ID must be a string",
-        "string.empty": "Carrier ID is required",
-        "any.required": "Carrier ID is required",
-    }),
-    request_token: Joi.string().required().messages({
-        "string.base": "Request token must be a string",
-        "string.empty": "Request token is required",
-        "any.required": "Request token is required",
-    }),
-});
+    carrierId: Joi.string().allow(null, "").optional(),
+    request_token: Joi.string().allow(null, "").optional(),
+}).unknown(true);
 
 // Schema for updating cart item quantity
 export const updateQuantitySchema = Joi.object({

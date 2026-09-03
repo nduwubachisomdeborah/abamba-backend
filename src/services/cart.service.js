@@ -134,24 +134,32 @@ class CartService {
             cart = await this.createCart(userId);
         }
 
-        const shippingOption = await ShippingOptions.findOne({
-            user: userId,
-            request_token: request_token,
-            product: productId,
-            variant: variantId,
-            quantity,
-        });
+        let shipping = null;
+        if (carrierId && request_token) {
+            const shippingOption = await ShippingOptions.findOne({
+                user: userId,
+                request_token: request_token,
+                product: productId,
+                variant: variantId,
+                quantity,
+            });
 
-        if (!shippingOption) {
-            throw new AppError("Select a valid shipping option", 404);
-        }
+            if (shippingOption && shippingOption.data?.couriers) {
+                const selectedCarrier = shippingOption.data.couriers.find(
+                    (carrier) => carrier.courier_id === carrierId
+                );
 
-        const selectedCarrier = shippingOption.data.couriers.find(
-            (carrier) => carrier.courier_id === carrierId
-        );
-
-        if (!selectedCarrier) {
-            throw new AppError("Select a valid carrier", 404);
+                if (selectedCarrier) {
+                    shipping = {
+                        amount: selectedCarrier.total,
+                        service_code: selectedCarrier.service_code,
+                        carrierId: selectedCarrier.courier_id,
+                        carrierName: selectedCarrier.courier_name,
+                        carrierLogo: selectedCarrier.courier_image,
+                        request_token: request_token,
+                    };
+                }
+            }
         }
 
         // Check if item already exists in cart
@@ -170,32 +178,22 @@ class CartService {
         if (existingItemIndex > -1) {
             // Update existing item quantity
             cart.items[existingItemIndex].quantity += quantity;
-            cart.items[existingItemIndex].shipping = {
-                amount: selectedCarrier.total,
-                service_code: selectedCarrier.service_code,
-                carrierId: selectedCarrier.courier_id,
-                carrierName: selectedCarrier.courier_name,
-                carrierLogo: selectedCarrier.courier_image,
-                request_token: request_token,
-            };
+            if (shipping) {
+                cart.items[existingItemIndex].shipping = shipping;
+            }
         } else {
-            const shipping = {
-                amount: selectedCarrier.total,
-                service_code: selectedCarrier.service_code,
-                carrierId: selectedCarrier.courier_id,
-                carrierName: selectedCarrier.courier_name,
-                carrierLogo: selectedCarrier.courier_image,
-                request_token: request_token,
-            };
-
-            // Add new item to cart
-            cart.items.push({
+            const newItem = {
                 product: productId,
                 variant: variantId || null,
                 quantity,
                 price,
-                shipping,
-            });
+            };
+            if (shipping) {
+                newItem.shipping = shipping;
+            }
+
+            // Add new item to cart
+            cart.items.push(newItem);
         }
 
         // Save cart and populate
