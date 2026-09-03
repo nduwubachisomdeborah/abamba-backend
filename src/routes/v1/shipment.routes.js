@@ -12,10 +12,16 @@ import {
 
 const router = express.Router();
 
-// Public route for tracking
+// Public / Optional-auth routes
 router.get(
     "/tracking/:trackingNumber",
     ShipmentController.getShipmentByTracking,
+);
+router.post(
+    "/carriers",
+    optionalAuth(authenticate),
+    validateGetCarriers,
+    ShipmentController.getCarriers,
 );
 
 // Protect all other shipment routes
@@ -24,8 +30,6 @@ router.use(authenticate);
 // Routes accessible by users, sellers, and admins
 router.get("/", ShipmentController.getShipments);
 router.get("/:id", ShipmentController.getShipmentById);
-
-router.post("/carriers", validateGetCarriers, ShipmentController.getCarriers);
 
 // Admin-only routes
 router.post(

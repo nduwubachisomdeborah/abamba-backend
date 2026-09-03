@@ -179,32 +179,16 @@ export const updateShipmentSchema = Joi.object({
         "object.min": "At least one field is required for shipment update",
     });
 
-// Schema for creating a shipment
 export const getCarriersSchema = Joi.object({
-    productId: Joi.string().custom(objectIdValidator).required().messages({
+    productId: Joi.string().required().messages({
         "string.base": "Product ID must be a string",
-        "string.objectId": "Invalid product ID format",
         "any.required": "Product ID is required",
     }),
-    shippingAddressId: Joi.string()
-        .custom(objectIdValidator)
-        .required()
-        .messages({
-            "string.base": "Shipping address ID must be a string",
-            "string.objectId": "Invalid shipping address ID format",
-            "any.required": "Shipping address ID is required",
-        }),
-    variantId: Joi.string().custom(objectIdValidator).allow(null).messages({
-        "string.base": "Variant ID must be a string",
-        "string.objectId": "Invalid variant ID format",
-    }),
-    quantity: Joi.number().integer().min(1).required().messages({
-        "number.base": "Quantity must be a number",
-        "number.integer": "Quantity must be an integer",
-        "number.min": "Quantity must be at least 1",
-        "any.required": "Quantity is required",
-    }),
-});
+    shippingAddressId: Joi.string().allow(null, "").optional(),
+    addressId: Joi.string().allow(null, "").optional(),
+    variantId: Joi.string().allow(null, "").optional(),
+    quantity: Joi.number().integer().min(1).default(1).optional(),
+}).unknown(true);
 
 // Create validation middleware functions
 export const validateCreateShipment = validate(createShipmentSchema);
