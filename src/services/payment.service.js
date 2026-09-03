@@ -243,20 +243,23 @@ class PaymentService {
 
         // Check for assigned logistics company
         let assignedCompany = null;
-        if (
+        const requestedCarrier =
+            orderData.carrierId ||
+            orderData.carrier ||
             orderData.logisticsCompanyId ||
             orderData.companyId ||
-            orderData.logisticsCompany
-        ) {
-            const companyId =
-                orderData.logisticsCompanyId ||
-                orderData.companyId ||
-                orderData.logisticsCompany;
-            if (mongoose.Types.ObjectId.isValid(companyId)) {
-                assignedCompany = await LogisticsCompany.findById(companyId);
-            } else if (typeof companyId === "string") {
+            orderData.logisticsCompany;
+
+        if (requestedCarrier) {
+            if (mongoose.Types.ObjectId.isValid(requestedCarrier)) {
+                assignedCompany = await LogisticsCompany.findById(requestedCarrier);
+            }
+            if (!assignedCompany && typeof requestedCarrier === "string") {
                 assignedCompany = await LogisticsCompany.findOne({
-                    code: companyId.toLowerCase(),
+                    $or: [
+                        { code: requestedCarrier.toLowerCase() },
+                        { name: new RegExp(requestedCarrier, "i") },
+                    ],
                 });
             }
         }
