@@ -681,7 +681,20 @@ class CartService {
                     }
                 }
 
-                itemObj.price = finalPrice;
+                const primaryImage =
+                    (product?.images && product.images[0]?.url) ||
+                    (typeof product?.images?.[0] === "string"
+                        ? product.images[0]
+                        : null) ||
+                    product?.image ||
+                    itemObj.image ||
+                    "https://abamba.store/placeholder.png";
+
+                itemObj.image = primaryImage;
+                itemObj.name = product?.name || itemObj.name || "Product";
+                if (itemObj.product && typeof itemObj.product === "object") {
+                    itemObj.product.image = primaryImage;
+                }
 
                 // Update totals (only count available items in total)
                 if (itemObj.isAvailable) {
