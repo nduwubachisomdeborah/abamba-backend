@@ -3,6 +3,7 @@ import Product from "../models/product.model.js";
 import { AppError } from "../middlewares/error.js";
 import mongoose from "mongoose";
 import ShippingOptions from "../models/shippingOptions.model.js";
+import LogisticsCompany from "../models/logisticsCompany.model.js";
 import shipbubbleService from "./shiping/shipbubble.service.js";
 import addressService from "./address.service.js";
 import PlatformSettings from "../models/platformSettings.model.js";
@@ -135,14 +136,14 @@ class CartService {
         }
 
         let shipping = null;
-        if (carrierId && request_token) {
-            const shippingOption = await ShippingOptions.findOne({
-                user: userId,
-                request_token: request_token,
-                product: productId,
-                variant: variantId,
-                quantity,
-            });
+        if (carrierId) {
+            // First check cached ShippingOptions
+            let shippingOption = null;
+            if (request_token) {
+                shippingOption = await ShippingOptions.findOne({
+                    request_token: request_token,
+                });
+            }
 
             if (shippingOption && shippingOption.data?.couriers) {
                 const selectedCarrier = shippingOption.data.couriers.find(
@@ -157,6 +158,41 @@ class CartService {
                         carrierName: selectedCarrier.courier_name,
                         carrierLogo: selectedCarrier.courier_image,
                         request_token: request_token,
+                    };
+                }
+            }
+
+            // If not found in ShippingOptions, fallback directly to Regional LogisticsCompany
+            if (!shipping) {
+                const company = await LogisticsCompany.findOne({
+                    $or: [
+                        { code: carrierId },
+                        {
+                            _id: mongoose.Types.ObjectId.isValid(carrierId)
+                                ? carrierId
+                                : null,
+                        },
+                    ],
+                });
+
+                if (company) {
+                    shipping = {
+                        amount: company.defaultBasePrice || 3000,
+                        service_code: company.code || "regional",
+                        carrierId: company.code || company._id.toString(),
+                        carrierName: `${company.name} (Standard Delivery)`,
+                        carrierLogo: null,
+                        request_token: request_token || "REQ-REGIONAL",
+                    };
+                } else {
+                    // Default regional fallback
+                    shipping = {
+                        amount: 3000,
+                        service_code: "richmond",
+                        carrierId: "richmond",
+                        carrierName: "Richmond Logistics (Standard Delivery)",
+                        carrierLogo: null,
+                        request_token: request_token || "REQ-REGIONAL",
                     };
                 }
             }
@@ -246,39 +282,26 @@ class CartService {
                 );
             }
         } else {
-            if (product.stock < quantity) {
+            if (product.quantity < quantity) {
                 throw new AppError(
-                    `Only ${product.stock} items available in stock`,
+                    `Only ${product.quantity} items available in stock`,
                     400
                 );
             }
         }
 
-        const defaultAddress = await addressService.getDefaultAddress(userId);
-
-        const carriers = await shipbubbleService.getCarriers(
-            userId,
-            defaultAddress.addressId,
-            item.product,
-            item.variant,
-            quantity
-        );
-
-        const selectedCarrier = carriers.couriers.find(
-            (carrier) => carrier.courier_id === item.shipping.carrierId
-        );
-
-        item.shipping = {
-            amount: selectedCarrier.total,
-            service_code: selectedCarrier.service_code,
-            carrierId: selectedCarrier.courier_id,
-            carrierName: selectedCarrier.courier_name,
-            carrierLogo: selectedCarrier.courier_image,
-            request_token: carriers.request_token,
-        };
-
         // Update the quantity
         item.quantity = quantity;
+
+        // Maintain shipping rate safely without throwing
+        if (item.shipping && item.shipping.carrierId) {
+            const company = await LogisticsCompany.findOne({
+                code: item.shipping.carrierId,
+            });
+            if (company) {
+                item.shipping.amount = company.defaultBasePrice || 3000;
+            }
+        }
 
         // Save cart and populate
         await cart.save();
