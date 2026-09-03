@@ -196,6 +196,21 @@ class CartService {
                     };
                 }
             }
+        if (!shipping) {
+            shipping = {
+                amount: 3000,
+                price: 3000,
+                total: 3000,
+                fee: 3000,
+                service_code: "richmond",
+                carrierId: "richmond",
+                courier_id: "richmond",
+                carrierName: "RichmondLogistics (Standard Delivery)",
+                courier_name: "RichmondLogistics (Standard Delivery)",
+                name: "RichmondLogistics",
+                carrierLogo: null,
+                request_token: request_token || "REQ-REGIONAL",
+            };
         }
 
         // Check if item already exists in cart
@@ -223,10 +238,8 @@ class CartService {
                 variant: variantId || null,
                 quantity,
                 price,
+                shipping,
             };
-            if (shipping) {
-                newItem.shipping = shipping;
-            }
 
             // Add new item to cart
             cart.items.push(newItem);
@@ -536,12 +549,62 @@ class CartService {
             })
         );
 
+        // Calculate accumulated shipping fee across cart items
+        let totalShippingFee = 0;
+        let activeCourier = null;
+
+        enhancedItems.forEach((item) => {
+            const shipAmount =
+                item.shipping?.amount !== undefined &&
+                !isNaN(Number(item.shipping?.amount))
+                    ? Number(item.shipping.amount)
+                    : 3000;
+            totalShippingFee += shipAmount;
+            if (!activeCourier && item.shipping) {
+                activeCourier = item.shipping;
+            }
+        });
+
+        // Default to standard regional delivery (3000) if no items or fee
+        if (totalShippingFee === 0) {
+            totalShippingFee = 3000;
+        }
+
+        if (!activeCourier) {
+            activeCourier = {
+                amount: 3000,
+                price: 3000,
+                total: 3000,
+                fee: 3000,
+                service_code: "richmond",
+                carrierId: "richmond",
+                courier_id: "richmond",
+                carrierName: "RichmondLogistics",
+                courier_name: "RichmondLogistics",
+                name: "RichmondLogistics",
+                state: "Imo",
+                hub: "Owerri Hub",
+            };
+        }
+
+        const estimatedTotal =
+            Number(totalPrice || 0) + Number(totalShippingFee || 3000);
+
         // Update cart totals in memory only
         const result = populatedCart.toObject();
         result.items = enhancedItems;
         result.totalItems = totalItems;
         result.totalPrice = totalPrice;
         result.subtotal = totalPrice;
+        result.shippingCost = totalShippingFee;
+        result.shippingFee = totalShippingFee;
+        result.shippingTotal = totalShippingFee;
+        result.shipping = totalShippingFee;
+        result.shippingDetails = activeCourier;
+        result.selectedCourier = activeCourier;
+        result.courier = activeCourier;
+        result.estimatedTotal = estimatedTotal;
+        result.total = estimatedTotal;
 
         // Save only the essential cart data back to the database
         // This prevents loss of calculated fields that aren't part of the schema

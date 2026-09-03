@@ -3,23 +3,27 @@ import mongoose from "mongoose";
 const itemShipmentSchema = new mongoose.Schema({
     amount: {
         type: Number,
-        required: true,
+        default: 3000,
     },
     service_code: {
         type: String,
+        default: "richmond",
     },
     carrierId: {
         type: String,
+        default: "richmond",
     },
     carrierName: {
         type: String,
+        default: "RichmondLogistics",
     },
     carrierLogo: {
         type: String,
+        default: null,
     },
     request_token: {
         type: String,
-        required: true,
+        default: "REQ-REGIONAL",
     },
 });
 
@@ -42,7 +46,14 @@ const cartItemSchema = new mongoose.Schema(
         },
         shipping: {
             type: itemShipmentSchema,
-            required: true,
+            required: false,
+            default: () => ({
+                amount: 3000,
+                service_code: "richmond",
+                carrierId: "richmond",
+                carrierName: "RichmondLogistics",
+                request_token: "REQ-REGIONAL",
+            }),
         },
         price: {
             type: Number,
