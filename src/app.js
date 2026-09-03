@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import mongoose from "mongoose";
+import dns from "dns";
 import cors from "cors";
 import dotenv from "dotenv";
 import morgan from "morgan";
@@ -97,6 +98,15 @@ const mongooseOptions = {
     serverSelectionTimeoutMS: 10000,
     family: 4, // IPv4 lookup for faster DNS
 };
+
+// Ensure MongoDB SRV records resolve reliably across Windows and cloud networks
+if (process.env.MONGODB_URI && process.env.MONGODB_URI.startsWith("mongodb+srv")) {
+    try {
+        dns.setServers(["8.8.8.8", "1.1.1.1"]);
+    } catch (dnsErr) {
+        console.warn("Could not set DNS servers:", dnsErr.message);
+    }
+}
 
 mongoose
     .connect(process.env.MONGODB_URI, mongooseOptions)
