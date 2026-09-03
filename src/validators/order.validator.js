@@ -79,6 +79,7 @@ export const createOrderSchema = Joi.object({
         .allow("", null)
         .default("paystack")
         .optional(),
+    items: Joi.array().items(Joi.object().unknown(true)).optional(),
     paymentDetails: paymentDetailsSchema.optional(),
     notes: Joi.string().allow("").default("").max(500).optional().messages({
         "string.base": "Notes must be a string",

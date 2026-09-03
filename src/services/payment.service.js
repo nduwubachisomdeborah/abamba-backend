@@ -187,7 +187,51 @@ class PaymentService {
         }
 
         // Load cart
-        const cart = await Cart.findOne({ user: userId });
+        let cart = await Cart.findOne({ user: userId });
+
+        // If cart is empty or missing, try to auto-populate from orderData.items (e.g. from frontend checkout)
+        if (
+            (!cart || !cart.items || cart.items.length === 0) &&
+            Array.isArray(orderData.items) &&
+            orderData.items.length > 0
+        ) {
+            if (!cart) {
+                cart = new Cart({
+                    user: userId,
+                    items: [],
+                    totalItems: 0,
+                    totalPrice: 0,
+                });
+            }
+            for (const itm of orderData.items) {
+                const prodId = itm.productId || itm.product || itm._id || itm.id;
+                if (prodId && mongoose.Types.ObjectId.isValid(prodId)) {
+                    const prodDoc = await Product.findOne({ _id: prodId, deleted: false });
+                    if (prodDoc) {
+                        const qty = Math.max(1, Number(itm.quantity) || 1);
+                        const unitPrice = Number(itm.price) || prodDoc.basePrice;
+                        cart.items.push({
+                            product: prodDoc._id,
+                            variant:
+                                itm.variantId && mongoose.Types.ObjectId.isValid(itm.variantId)
+                                    ? itm.variantId
+                                    : null,
+                            quantity: qty,
+                            price: unitPrice,
+                            total: unitPrice * qty,
+                            shipping: {
+                                amount: Number(itm.shippingFee || itm.shipping?.amount || 0),
+                            },
+                        });
+                    }
+                }
+            }
+            if (cart.items.length > 0) {
+                cart.totalItems = cart.items.reduce((sum, i) => sum + i.quantity, 0);
+                cart.totalPrice = cart.items.reduce((sum, i) => sum + i.total, 0);
+                await cart.save();
+            }
+        }
 
         if (!cart || !cart.items || cart.items.length === 0) {
             throw new AppError(
