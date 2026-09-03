@@ -37,8 +37,7 @@ router.post(
 // OTP verification route - public route, uses email and OTP code
 router.post("/verify-otp", validate(verifyOTPSchema), AuthController.verifyOTP);
 
-// Other protected routes would use the regular authenticate middleware
-// router.use(authenticate);
-// Add any routes that require full authentication here
+// Protected routes (require authentication)
+router.post("/switch-role", authenticate, AuthController.switchRole);
 
 export default router;

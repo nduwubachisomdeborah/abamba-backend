@@ -141,11 +141,21 @@ class AuthService {
      * @param {string} password - User password
      * @returns {Promise<Object>} User object with OTP and token
      */
+    /**
+     * Login user with email and password
+     * @param {string} email - User email
+     * @param {string} password - User password
+     * @returns {Promise<Object>} User object with OTP and token
+     */
     async login(email, password, role = "user") {
-        // Find user by email with OTP fields
-        const user = await User.findOne({ email, role }).select(
-            "+password +otp.code +otp.expiresAt"
-        );
+        if (!email) {
+            throw new AppError("Email is required", 400);
+        }
+
+        // Find user by email (role-agnostic to support multi-role accounts seamlessly)
+        const user = await User.findOne({
+            email: email.toLowerCase().trim(),
+        }).select("+password +otp.code +otp.expiresAt");
 
         if (!user) {
             throw new AppError("User not found", 404);
@@ -161,6 +171,11 @@ class AuthService {
                 "User is suspended, please contact support",
                 401
             );
+        }
+
+        // Ensure roles array includes buyer/user when accessing customer view
+        if (!user.roles || !Array.isArray(user.roles)) {
+            user.roles = [user.role || "buyer"];
         }
 
         // Generate new OTP for verification
@@ -211,10 +226,14 @@ class AuthService {
      * @returns {Promise<Object>} User object with token
      */
     async verifyOTP(email, otpCode, role = "user") {
+        if (!email) {
+            throw new AppError("Email is required", 400);
+        }
+
         // Find user by email with OTP fields
-        const user = await User.findOne({ email, role }).select(
-            "+otp.code +otp.expiresAt +business"
-        );
+        const user = await User.findOne({
+            email: email.toLowerCase().trim(),
+        }).select("+otp.code +otp.expiresAt +business");
 
         if (!user) {
             throw new AppError("User not found", 404);
@@ -278,8 +297,12 @@ class AuthService {
      * @returns {Promise<Object>} New OTP code
      */
     async resendOTP(email, role = "user") {
-        // Find user by email
-        const user = await User.findOne({ email, role });
+        if (!email) {
+            throw new AppError("Email is required", 400);
+        }
+
+        // Find user by email (role-agnostic)
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
 
         if (!user) {
             throw new AppError("User not found", 404);
@@ -342,12 +365,11 @@ class AuthService {
      * @returns {Promise<Object>} Message and OTP for testing
      */
     async forgotPassword(email, role) {
-        // Find user by email
-        const query = { email };
-        if (role) {
-            query.role = role;
+        if (!email) {
+            throw new AppError("Email is required", 400);
         }
-        const user = await User.findOne(query);
+
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
 
         if (!user) {
             throw new AppError("User not found", 404);
@@ -395,12 +417,11 @@ class AuthService {
      * @returns {Promise<Object>} User object with token
      */
     async resetPassword(email, otpCode, newPassword, role) {
-        // Find user by email with OTP fields
-        const query = { email };
-        if (role) {
-            query.role = role;
+        if (!email) {
+            throw new AppError("Email is required", 400);
         }
-        const user = await User.findOne(query).select(
+
+        const user = await User.findOne({ email: email.toLowerCase().trim() }).select(
             "+otp.code +otp.expiresAt +password"
         );
 
@@ -625,6 +646,49 @@ class AuthService {
         const token = user.generateAuthToken();
 
         // Return user (without sensitive info) and token
+        const userObject = user.toObject();
+        delete userObject.password;
+        if (userObject.otp) delete userObject.otp.code;
+
+        return {
+            user: userObject,
+            token,
+        };
+    }
+
+    /**
+     * Switch active role for multi-role users (e.g. from seller to customer/buyer or vice versa)
+     * @param {string} userId - User ID
+     * @param {string} targetRole - Requested role ("customer", "buyer", "seller", "user")
+     * @returns {Promise<Object>} Updated user and refreshed JWT token
+     */
+    async switchRole(userId, targetRole) {
+        const user = await User.findById(userId);
+        if (!user) {
+            throw new AppError("User not found", 404);
+        }
+
+        const normalizedRole =
+            targetRole === "customer" || targetRole === "buyer"
+                ? "user"
+                : targetRole;
+
+        if (!user.roles || !Array.isArray(user.roles)) {
+            user.roles = [user.role || "buyer"];
+        }
+
+        const roleLabel = normalizedRole === "user" ? "buyer" : normalizedRole;
+        if (
+            !user.roles.includes(roleLabel) &&
+            !user.roles.includes(normalizedRole)
+        ) {
+            user.roles.push(roleLabel);
+        }
+
+        user.role = normalizedRole;
+        await user.save();
+
+        const token = user.generateAuthToken();
         const userObject = user.toObject();
         delete userObject.password;
         if (userObject.otp) delete userObject.otp.code;

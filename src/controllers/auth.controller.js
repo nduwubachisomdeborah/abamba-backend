@@ -161,6 +161,21 @@ class AuthController {
             token: result.token,
         });
     });
+
+    /**
+     * @desc    Switch user active view/role (Buyer <-> Seller)
+     * @route   POST /api/v1/auth/switch-role
+     * @access  Private
+     */
+    static switchRole = asyncHandler(async (req, res) => {
+        const targetRole = req.body.role || req.body.targetRole || "user";
+        const result = await authService.switchRole(req.user.id, targetRole);
+
+        return successResponse(res, `Switched to ${targetRole} mode successfully`, {
+            user: result.user,
+            token: result.token,
+        });
+    });
 }
 
 export default AuthController;
