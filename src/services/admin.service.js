@@ -416,7 +416,12 @@ class AdminService {
                     as: "user",
                 },
             },
-            { $unwind: "$user" },
+            {
+                $unwind: {
+                    path: "$user",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
             {
                 $project: {
                     "user.password": 0,
