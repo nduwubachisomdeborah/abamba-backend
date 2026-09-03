@@ -14,9 +14,12 @@ class WishlistService {
      * @returns {Promise<Object>} Wishlists and pagination info
      */
     async getWishlists(userId, query = {}) {
-        const { page = 1, limit = 10 } = query;
+        const { page = 1, limit = 50 } = query;
 
         const filter = { user: userId };
+
+        // Ensure user has at least their default wishlist
+        await this.getOrCreateDefaultWishlist(userId);
 
         // Get pagination options
         const {
@@ -36,6 +39,38 @@ class WishlistService {
             .populate("products.product")
             .lean();
 
+        // Extract flat products array and items array for immediate UI consumption
+        const allProducts = [];
+        const items = [];
+        const seenProductIds = new Set();
+
+        wishlists.forEach((wl) => {
+            if (wl.products && Array.isArray(wl.products)) {
+                wl.products.forEach((pItem) => {
+                    if (pItem.product && pItem.product._id) {
+                        const pId = pItem.product._id.toString();
+                        if (!seenProductIds.has(pId)) {
+                            seenProductIds.add(pId);
+                            const pObj = {
+                                ...pItem.product,
+                                isInWishlist: true,
+                                isWishlisted: true,
+                                wishlistAddedAt: pItem.addedAt,
+                            };
+                            allProducts.push(pObj);
+                            items.push({
+                                _id: pItem._id,
+                                id: pItem._id,
+                                product: pObj,
+                                addedAt: pItem.addedAt,
+                                notes: pItem.notes,
+                            });
+                        }
+                    }
+                });
+            }
+        });
+
         // Get pagination data
         const paginationData = PaginationUtil.getPaginationData(
             total,
@@ -45,6 +80,11 @@ class WishlistService {
 
         return {
             wishlists,
+            defaultWishlist: wishlists[0] || null,
+            products: allProducts,
+            items,
+            count: allProducts.length,
+            totalProducts: allProducts.length,
             pagination: paginationData,
         };
     }

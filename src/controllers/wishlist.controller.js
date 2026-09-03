@@ -9,9 +9,9 @@ class WishlistController {
    * @access  Private
    */
   static getWishlists = asyncHandler(async (req, res) => {
-    const { wishlists, pagination } = await wishlistService.getWishlists(req.user.id, req.query);
+    const result = await wishlistService.getWishlists(req.user.id, req.query);
     
-    return successResponse(res, 'Wishlists retrieved successfully', { wishlists, pagination });
+    return successResponse(res, 'Wishlists retrieved successfully', result);
   });
 
   /**
