@@ -8,12 +8,21 @@ class AdminStatsService {
    */
   async getStats() {
     // Total amount of payments for completed payments (paid orders)
+    const paidMatch = {
+      deleted: { $ne: true },
+      $or: [
+        { "payment.status": "completed" },
+        { "payment.status": "paid" },
+        { paymentStatus: "paid" },
+        { status: "processing" },
+        { status: "completed" },
+        { status: "delivered" },
+      ],
+    };
+
     const paymentAgg = await Order.aggregate([
       {
-        $match: {
-          deleted: { $ne: true },
-          "payment.status": "completed",
-        },
+        $match: paidMatch,
       },
       {
         $group: {
@@ -28,8 +37,8 @@ class AdminStatsService {
     const ordersPaidCount = paymentAgg.length > 0 ? paymentAgg[0].count : 0;
 
     // Top 10 selling products
-    const topSellingProducts = await Order.aggregate([
-      { $match: { "payment.status": "completed", deleted: { $ne: true } } },
+    let topSellingProducts = await Order.aggregate([
+      { $match: paidMatch },
       { $unwind: "$items" },
       {
         $group: {
@@ -59,6 +68,40 @@ class AdminStatsService {
       },
     ]);
 
+    // Fallback: If no completed paid orders yet, show top products by existing order activity
+    if (!topSellingProducts || topSellingProducts.length === 0) {
+      topSellingProducts = await Order.aggregate([
+        { $match: { deleted: { $ne: true } } },
+        { $unwind: "$items" },
+        {
+          $group: {
+            _id: "$items.product",
+            totalAmountSold: { $sum: { $multiply: ["$items.price", "$items.quantity"] } },
+            totalCountSold: { $sum: "$items.quantity" },
+          },
+        },
+        { $sort: { totalCountSold: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: "products",
+            localField: "_id",
+            foreignField: "_id",
+            as: "productInfo",
+          },
+        },
+        { $unwind: "$productInfo" },
+        {
+          $project: {
+            _id: 0,
+            product: "$productInfo",
+            totalAmountSold: 1,
+            totalCountSold: 1,
+          },
+        },
+      ]);
+    }
+
     // User and seller counts (exclude soft-deleted and temporary guests)
     const [usersCount, sellersCount] = await Promise.all([
       User.countDocuments({ role: "user", deleted: { $ne: true }, isGuest: { $ne: true } }),
@@ -74,7 +117,7 @@ class AdminStatsService {
       {
         $match: {
           createdAt: { $gte: startOfDay, $lt: endOfDay },
-          "payment.status": "completed",
+          ...paidMatch,
         },
       },
       {
@@ -105,7 +148,7 @@ class AdminStatsService {
       {
         $match: {
           createdAt: { $gte: startOfYear, $lt: endOfYear },
-          "payment.status": "completed",
+          ...paidMatch,
         },
       },
       {

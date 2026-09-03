@@ -863,8 +863,18 @@ class PaymentService {
     }
 
     async getPaymentStatus(reference) {
-        const payment = await Payment.findOne({ reference });
+        let payment = await Payment.findOne({ reference });
         if (!payment) throw new AppError("Payment not found", 404);
+
+        // If payment is pending, query Paystack/provider directly to confirm and finalize
+        if (payment.status !== "completed") {
+            try {
+                await this.verifyAndFinalizeByReference(reference);
+                payment = await Payment.findOne({ reference });
+            } catch (vErr) {
+                // Not completed yet or awaiting user action
+            }
+        }
 
         const orderHolder = await OrderHolder.findOne({
             payment: payment._id,
