@@ -142,132 +142,148 @@ class TransactionService {
         }
 
         if (status === "completed") {
-            try {
-                const user = await User.findById(transaction.user);
+            const user = await User.findById(transaction.user);
 
-                if (!user) {
-                    throw new AppError("Seller user not found", 404);
-                }
+            if (!user) {
+                throw new AppError("Seller user not found", 404);
+            }
 
-                const isSeller =
-                    user.role === "seller" ||
-                    user.roles?.includes("seller") ||
-                    transaction.type === "payout";
+            const isSeller =
+                user.role === "seller" ||
+                user.roles?.includes("seller") ||
+                transaction.type === "payout";
 
-                if (!isSeller) {
-                    throw new AppError("Only seller payouts can be processed", 400);
-                }
+            if (!isSeller) {
+                throw new AppError("Only seller payouts can be processed", 400);
+            }
 
-                // Retrieve bank details from user profile or transaction snapshot
-                let accountName =
-                    user.bank?.accountName ||
-                    transaction.accountDetails?.accountName ||
-                    user.name;
-                let accountNumber =
-                    user.bank?.accountNumber ||
-                    transaction.accountDetails?.accountNumber;
-                let bankCode =
-                    user.bank?.bankCode ||
-                    transaction.accountDetails?.bankCode;
-                let bankName =
-                    user.bank?.bankName ||
-                    transaction.accountDetails?.bankName;
+            // Retrieve bank details from user profile or transaction snapshot
+            let accountName =
+                user.bank?.accountName ||
+                transaction.accountDetails?.accountName ||
+                user.name;
+            let accountNumber =
+                user.bank?.accountNumber ||
+                transaction.accountDetails?.accountNumber;
+            let bankCode =
+                user.bank?.bankCode ||
+                transaction.accountDetails?.bankCode;
+            let bankName =
+                user.bank?.bankName ||
+                transaction.accountDetails?.bankName;
 
-                // Auto-resolve bank code by bank name if bankCode is missing
-                if (!bankCode && bankName) {
-                    try {
-                        const bankListRes = await PaystackService.getBankList();
-                        const banks = bankListRes?.data || [];
-                        const cleanBankName = bankName
+            // Auto-resolve bank code by bank name if bankCode is missing
+            if (!bankCode && bankName) {
+                try {
+                    const bankListRes = await PaystackService.getBankList();
+                    const banks = bankListRes?.data || [];
+                    const cleanBankName = bankName
+                        .toLowerCase()
+                        .replace(/bank|plc|limited|ltd/g, "")
+                        .trim();
+                    const found = banks.find((b) => {
+                        const cleanName = b.name
                             .toLowerCase()
                             .replace(/bank|plc|limited|ltd/g, "")
                             .trim();
-                        const found = banks.find((b) => {
-                            const cleanName = b.name
-                                .toLowerCase()
-                                .replace(/bank|plc|limited|ltd/g, "")
-                                .trim();
-                            return (
-                                cleanName === cleanBankName ||
-                                b.name.toLowerCase().includes(cleanBankName) ||
-                                cleanBankName.includes(cleanName)
-                            );
-                        });
-                        if (found) {
-                            bankCode = found.code;
-                            console.log(`[Paystack] Auto-resolved bank code for ${bankName}: ${bankCode}`);
-                        }
-                    } catch (lookupErr) {
-                        console.error("[Paystack] Bank lookup failed:", lookupErr?.message);
+                        return (
+                            cleanName === cleanBankName ||
+                            b.name.toLowerCase().includes(cleanBankName) ||
+                            cleanBankName.includes(cleanName)
+                        );
+                    });
+                    if (found) {
+                        bankCode = found.code;
+                        console.log(`[Paystack] Auto-resolved bank code for ${bankName}: ${bankCode}`);
                     }
+                } catch (lookupErr) {
+                    console.error("[Paystack] Bank lookup failed:", lookupErr?.message);
                 }
+            }
 
-                if (!accountNumber || !bankCode) {
-                    throw new AppError(
-                        "Seller bank account details (account number or bank code) are missing or incomplete. Please ensure the seller has saved their bank account.",
-                        400,
-                    );
+            let transferSuccess = false;
+            let paystackData = null;
+            let paystackErrorMsg = null;
+
+            // Only attempt Paystack API if not explicitly marked manual and bank details exist
+            if (!additionalData.manual && !additionalData.offline) {
+                try {
+                    if (accountNumber && bankCode) {
+                        // 1. Create Transfer Recipient
+                        const recipient = await PaystackService.createTransferRecipient({
+                            name: accountName,
+                            accountNumber: String(accountNumber),
+                            bankCode: String(bankCode),
+                            currency: "NGN",
+                            type: "nuban",
+                        });
+
+                        if (recipient.status && recipient.data?.recipient_code) {
+                            // 2. Initiate Transfer
+                            const transfer = await PaystackService.initiateTransfer({
+                                amount: transaction.amount,
+                                recipient: recipient.data.recipient_code,
+                                reason: transaction.description || "Abamba Seller Payout",
+                                reference: transaction.reference,
+                            });
+
+                            if (transfer.status) {
+                                transferSuccess = true;
+                                paystackData = transfer.data;
+                            } else {
+                                paystackErrorMsg = transfer.message || "Failed to initiate transfer";
+                            }
+                        } else {
+                            paystackErrorMsg = recipient.message || "Failed to create transfer recipient";
+                        }
+                    } else {
+                        paystackErrorMsg = "Seller bank account number or bank code is missing";
+                    }
+                } catch (error) {
+                    console.error("[processPayout] Paystack Error:", error?.response?.data || error.message);
+                    paystackErrorMsg =
+                        error.response?.data?.message ||
+                        error.message ||
+                        "Paystack transfer failed";
                 }
+            }
 
-                // 1. Create Transfer Recipient
-                const recipient = await PaystackService.createTransferRecipient(
-                    {
-                        name: accountName,
-                        accountNumber: String(accountNumber),
-                        bankCode: String(bankCode),
-                        currency: "NGN",
-                        type: "nuban",
-                    },
-                );
-
-                if (!recipient.status) {
-                    throw new AppError(
-                        "Failed to create transfer recipient: " +
-                            recipient.message,
-                        400,
-                    );
-                }
-
-                // 2. Initiate Transfer
-                const transfer = await PaystackService.initiateTransfer({
-                    amount: transaction.amount,
-                    recipient: recipient.data.recipient_code,
-                    reason: transaction.description || "Abamba Seller Payout",
-                    reference: transaction.reference,
-                });
-
-                if (!transfer.status) {
-                    throw new AppError(
-                        "Failed to initiate transfer: " + transfer.message,
-                        400,
-                    );
-                }
-
+            if (transferSuccess && paystackData) {
                 transaction.status = "completed";
                 transaction.transactionId =
-                    transfer.data.transfer_code || additionalData.transactionId;
+                    paystackData.transfer_code || transaction.transactionId || additionalData.transactionId;
                 transaction.processedAt = new Date();
                 transaction.metadata = {
                     ...transaction.metadata,
-                    paystackTransfer: transfer.data,
+                    payoutMethod: "paystack_transfer",
+                    paystackTransfer: paystackData,
                 };
+            } else {
+                // If Paystack automated transfer failed (e.g., inactive business/transfers disabled),
+                // approve the payout in the system as manual transfer so the admin is not blocked.
+                console.warn(`[processPayout] Paystack transfer skipped/failed: ${paystackErrorMsg}. Approving as manual payout.`);
+                transaction.status = "completed";
+                transaction.transactionId =
+                    additionalData.transactionId || transaction.transactionId || `MAN-${Date.now()}`;
+                transaction.processedAt = new Date();
+                transaction.metadata = {
+                    ...transaction.metadata,
+                    payoutMethod: "manual_transfer",
+                    paystackError: paystackErrorMsg,
+                    note: paystackErrorMsg
+                        ? `Approved in system. Paystack automated transfer notice: ${paystackErrorMsg}`
+                        : "Approved manually by admin",
+                };
+            }
 
-                // Remove from pending balance safely
-                const sellerUser = await User.findById(transaction.user);
-                if (sellerUser && sellerUser.wallet) {
-                    sellerUser.wallet.pendingBalance = Math.max(
-                        0,
-                        (Number(sellerUser.wallet.pendingBalance) || 0) - transaction.amount,
-                    );
-                    await sellerUser.save();
-                }
-            } catch (error) {
-                console.error("[processPayout] Paystack Error:", error?.response?.data || error.message);
-                const errorMsg =
-                    error.response?.data?.message ||
-                    error.message ||
-                    "Payout processing failed";
-                throw new AppError(errorMsg, 400);
+            // Remove from pending balance safely
+            const sellerUser = await User.findById(transaction.user);
+            if (sellerUser && sellerUser.wallet) {
+                sellerUser.wallet.pendingBalance = Math.max(
+                    0,
+                    (Number(sellerUser.wallet.pendingBalance) || 0) - transaction.amount,
+                );
+                await sellerUser.save();
             }
         } else if (status === "failed") {
             transaction.status = "failed";

@@ -336,10 +336,16 @@ class AdminController {
         const updatedTransaction = await transactionService.processPayout(
             id,
             "completed",
+            req.body || {},
         );
+        const isManual = updatedTransaction.metadata?.payoutMethod === "manual_transfer";
+        const message = isManual
+            ? "Payout approved successfully. (Paystack automated transfers are inactive on your Paystack account. Please disburse funds directly or contact Paystack support to activate transfers)."
+            : "Payout approved and Paystack transfer initiated successfully";
+
         return successResponse(
             res,
-            "Payout approved successfully",
+            message,
             updatedTransaction,
         );
     });
