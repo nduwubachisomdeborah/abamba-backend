@@ -32,17 +32,35 @@ class OrderService {
      * @returns {Promise<Object>} Order object
      */
     async getOrderById(orderId, userId, userRole) {
-        let order;
+        let query;
 
         // Check if orderId is a number (sequential ID) or ObjectId
         if (!isNaN(orderId)) {
-            order = await Order.findOne({ orderId: Number(orderId) });
+            query = { orderId: Number(orderId) };
         } else {
             if (!mongoose.Types.ObjectId.isValid(orderId)) {
                 throw new AppError("Invalid order ID", 400);
             }
-            order = await Order.findById(orderId);
+            query = { _id: orderId };
         }
+
+        const order = await Order.findOne(query)
+            .populate({
+                path: "user",
+                select: "name email phoneNumber addresses",
+            })
+            .populate({
+                path: "seller",
+                select: "name email business",
+            })
+            .populate({
+                path: "shipment",
+                select: "trackingNumber carrier status estimatedDeliveryDate trackingEvents",
+            })
+            .populate({
+                path: "items.product",
+                select: "name sku images basePrice category brand",
+            });
 
         if (!order) {
             throw new AppError("Order not found", 404);
@@ -53,13 +71,16 @@ class OrderService {
             // Admin can see any order
             return order;
         } else if (userRole === "seller") {
-            // Sellers can see orders containing their products
-            // Get the product IDs in this order
+            // Check if order belongs directly to seller or contains their products
+            const sellerIdStr = (order.seller?._id || order.seller)?.toString();
+            if (sellerIdStr && sellerIdStr === userId.toString()) {
+                return order;
+            }
+
             const orderProductIds = order.items.map((item) =>
-                item.product.toString()
+                (item.product?._id || item.product).toString()
             );
 
-            // Check if any of the products in the order belong to this seller
             const sellerProducts = await mongoose.model("Product").find({
                 _id: { $in: orderProductIds },
                 user: userId,
@@ -68,9 +89,12 @@ class OrderService {
             if (sellerProducts.length === 0) {
                 throw new AppError("Not authorized to view this order", 403);
             }
-        } else if (order.user.toString() !== userId) {
-            // Regular users can only see their own orders
-            throw new AppError("Not authorized to view this order", 403);
+        } else {
+            const customerIdStr = (order.user?._id || order.user)?.toString();
+            if (customerIdStr !== userId.toString()) {
+                // Regular users can only see their own orders
+                throw new AppError("Not authorized to view this order", 403);
+            }
         }
 
         return order;
@@ -97,7 +121,6 @@ class OrderService {
                 filter.user = query.userId;
             }
         } else if (userRole === "seller") {
-            // Sellers can see orders containing their products
             // Find all products by this seller
             const sellerProducts = await mongoose
                 .model("Product")
@@ -106,20 +129,10 @@ class OrderService {
                 product._id.toString()
             );
 
-            if (sellerProductIds.length === 0) {
-                // If seller has no products, return empty result
-                return {
-                    orders: [],
-                    pagination: PaginationUtil.getPaginationData(
-                        0,
-                        page,
-                        limit
-                    ),
-                };
-            }
-
-            // Find orders containing seller's products
-            filter["items.product"] = { $in: sellerProductIds };
+            filter.$or = [
+                { seller: userId },
+                ...(sellerProductIds.length > 0 ? [{ "items.product": { $in: sellerProductIds } }] : []),
+            ];
         } else {
             // Regular users can only see their own orders
             filter.user = userId;
@@ -174,11 +187,19 @@ class OrderService {
             .limit(limit)
             .populate({
                 path: "user",
-                select: "name email",
+                select: "name email phoneNumber",
+            })
+            .populate({
+                path: "seller",
+                select: "name email business",
             })
             .populate({
                 path: "shipment",
                 select: "trackingNumber carrier status",
+            })
+            .populate({
+                path: "items.product",
+                select: "name sku images basePrice category brand",
             });
 
         // Generate pagination metadata

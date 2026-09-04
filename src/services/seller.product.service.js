@@ -124,7 +124,10 @@ class SellerProductService {
 
         // Fetch platform settings to check if global bonus week is active
         const platformSettings = await PlatformSettings.getInstance();
-        const isBonusActive = Boolean(platformSettings?.isBonusEventActive);
+        const isBonusActive = Boolean(
+            platformSettings?.systemPreferences?.bonusWeekEnabled ??
+            platformSettings?.isBonusEventActive
+        );
 
         if (isBonusActive) {
             // When bonus week is ACTIVE: bonusPrice is strictly required and must be lower than basePrice

@@ -6,28 +6,36 @@ const platformSettingsSchema = new mongoose.Schema(
         platformName: {
             type: String,
             trim: true,
-            default: "Your Platform Name",
+            default: "Abamba",
         },
         platformUrl: {
             type: String,
             trim: true,
-            default: "http://example.com",
+            default: "https://abamba.com.ng",
         },
         adminEmail: {
             type: String,
             trim: true,
             lowercase: true,
+            default: "abambanigeria@gmail.com",
             match: [/^\S+@\S+\.\S+$/, "Please provide a valid email"],
         },
         supportEmail: {
             type: String,
             trim: true,
             lowercase: true,
+            default: "Abambasupport@gmail.com",
             match: [/^\S+@\S+\.\S+$/, "Please provide a valid email"],
         },
         contactInfo: {
             type: String,
             trim: true,
+            default: "+2348060039760",
+        },
+        companyAddress: {
+            type: String,
+            trim: true,
+            default: "",
         },
         timeZone: {
             type: String,
@@ -67,6 +75,10 @@ const platformSettingsSchema = new mongoose.Schema(
 
         // System Preferences
         systemPreferences: {
+            bonusWeekEnabled: {
+                type: Boolean,
+                default: true,
+            },
             maintenanceMode: {
                 type: Boolean,
                 default: false,
@@ -88,7 +100,7 @@ const platformSettingsSchema = new mongoose.Schema(
         // Global Bonus Week / Promotion Status
         isBonusEventActive: {
             type: Boolean,
-            default: false,
+            default: true,
         },
 
         // Security & Configurations
@@ -156,26 +168,26 @@ const platformSettingsSchema = new mongoose.Schema(
                 title: {
                     type: String,
                     trim: true,
-                    default: "Contact Us",
+                    default: "Contact our support team",
                 },
                 content: {
                     type: String,
                     trim: true,
-                    default: "",
+                    default: "We're here to help.",
                 },
             },
             storeLocation: {
                 address: {
                     type: String,
                     trim: true,
-                    default: "",
+                    default: "Nigeria",
                 },
             },
             contactCall: {
                 phoneNumber1: {
                     type: String,
                     trim: true,
-                    default: "",
+                    default: "+234 806 003 9760",
                 },
                 phoneNumber2: {
                     type: String,
@@ -188,14 +200,31 @@ const platformSettingsSchema = new mongoose.Schema(
                     type: String,
                     trim: true,
                     lowercase: true,
-                    default: "",
+                    default: "abambanigeria@gmail.com",
                 },
                 email2: {
                     type: String,
                     trim: true,
                     lowercase: true,
-                    default: "",
+                    default: "Abambasupport@gmail.com",
                 },
+            },
+            workingHours: {
+                line1: {
+                    type: String,
+                    trim: true,
+                    default: "Mon - Fri  8:00 - 18:00",
+                },
+                line2: {
+                    type: String,
+                    trim: true,
+                    default: "Sat - Sun  10:00 - 16:00",
+                },
+            },
+            helpCenterUrl: {
+                type: String,
+                trim: true,
+                default: "http://wa.me/2348060039760",
             },
         },
 
@@ -252,11 +281,26 @@ const platformSettingsSchema = new mongoose.Schema(
     }
 );
 
+// Sync isBonusEventActive and systemPreferences.bonusWeekEnabled on save
+platformSettingsSchema.pre("save", function (next) {
+    if (this.systemPreferences?.bonusWeekEnabled !== undefined) {
+        this.isBonusEventActive = this.systemPreferences.bonusWeekEnabled;
+    } else if (this.isBonusEventActive !== undefined) {
+        if (!this.systemPreferences) this.systemPreferences = {};
+        this.systemPreferences.bonusWeekEnabled = this.isBonusEventActive;
+    }
+    next();
+});
+
 // Ensure only one platform settings document exists
 platformSettingsSchema.statics.getInstance = async function () {
     let settings = await this.findOne();
     if (!settings) {
-        settings = await this.create({});
+        settings = await this.create({
+            adminEmail: "abambanigeria@gmail.com",
+            supportEmail: "Abambasupport@gmail.com",
+            systemPreferences: { bonusWeekEnabled: true },
+        });
     }
     return settings;
 };

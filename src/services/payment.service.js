@@ -243,7 +243,10 @@ class PaymentService {
 
         // Fetch platform settings for global bonus promotions
         const platformSettings = await PlatformSettings.getInstance();
-        const isBonusActive = Boolean(platformSettings?.isBonusEventActive);
+        const isBonusActive = Boolean(
+            platformSettings?.systemPreferences?.bonusWeekEnabled ??
+            platformSettings?.isBonusEventActive
+        );
 
         // Build order items with validation against products/variants
         const enrichedItems = await Promise.all(
@@ -327,7 +330,7 @@ class PaymentService {
                     product: citem.product,
                     variant: citem.variant,
                     name: product.name,
-                    sku,
+                    sku: sku || product.sku || "N/A",
                     price,
                     quantity: citem.quantity,
                     variantAttributes,

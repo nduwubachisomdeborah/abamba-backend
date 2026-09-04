@@ -20,6 +20,7 @@ const orderItemSchema = new mongoose.Schema(
         sku: {
             type: String,
             required: false,
+            default: "N/A",
         },
         price: {
             type: Number,
@@ -38,8 +39,28 @@ const orderItemSchema = new mongoose.Schema(
             type: String,
         },
     },
-    { _id: true },
+    { _id: true, toJSON: { virtuals: true }, toObject: { virtuals: true } },
 );
+
+// Virtual for total item price (price * quantity)
+orderItemSchema.virtual("totalPrice").get(function () {
+    return Number(((this.price || 0) * (this.quantity || 1)).toFixed(2));
+});
+
+orderItemSchema.virtual("formattedPrice").get(function () {
+    return `₦${Number(this.price || 0).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+});
+
+orderItemSchema.virtual("formattedTotalPrice").get(function () {
+    const total = (this.price || 0) * (this.quantity || 1);
+    return `₦${Number(total).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+});
 
 // Address schema for shipping and billing
 const addressSchema = new mongoose.Schema(
@@ -235,12 +256,48 @@ const orderSchema = new mongoose.Schema(
             default: null,
         },
     },
-    { timestamps: true },
+    { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } },
 );
 
-// Format total price
+// Virtuals for formatted currency values
+orderSchema.virtual("formattedSubtotal").get(function () {
+    return `₦${Number(this.subtotal || 0).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+});
+
+orderSchema.virtual("formattedShippingCost").get(function () {
+    return `₦${Number(this.shippingCost || 0).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+});
+
+orderSchema.virtual("formattedPlatformFee").get(function () {
+    return `₦${Number(this.platformFee || 0).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+});
+
 orderSchema.virtual("formattedTotal").get(function () {
-    return `$${this.total.toFixed(2)}`;
+    return `₦${Number(this.total || 0).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+});
+
+// Virtual for seller earnings (seller receives subtotal; shipping goes to logistics and platformFee to platform)
+orderSchema.virtual("sellerEarnings").get(function () {
+    return Number((this.subtotal || 0).toFixed(2));
+});
+
+orderSchema.virtual("formattedSellerEarnings").get(function () {
+    return `₦${Number(this.subtotal || 0).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
 });
 
 // Ensure orderId is set before saving

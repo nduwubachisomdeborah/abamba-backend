@@ -525,7 +525,10 @@ class CartService {
     async populateCart(cart) {
         // Fetch platform settings to check if global bonus week is active
         const platformSettings = await PlatformSettings.getInstance();
-        const isBonusActive = Boolean(platformSettings?.isBonusEventActive);
+        const isBonusActive = Boolean(
+            platformSettings?.systemPreferences?.bonusWeekEnabled ??
+            platformSettings?.isBonusEventActive
+        );
 
         // First populate just the products
         const populatedCart = await Cart.findById(cart._id).populate({

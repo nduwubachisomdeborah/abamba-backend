@@ -7,6 +7,7 @@ export const updatePlatformSettingsSchema = Joi.object({
     adminEmail: Joi.string().email().trim().optional(),
     supportEmail: Joi.string().email().trim().optional(),
     contactInfo: Joi.string().trim().optional(),
+    companyAddress: Joi.string().trim().optional().allow(""),
     timeZone: Joi.string().trim().optional(),
     logo: Joi.string().uri().trim().optional().allow(""),
     favicon: Joi.string().uri().trim().optional().allow(""),
@@ -22,6 +23,7 @@ export const updatePlatformSettingsSchema = Joi.object({
     
     // System Preferences
     systemPreferences: Joi.object({
+        bonusWeekEnabled: Joi.boolean().optional(),
         maintenanceMode: Joi.boolean().optional(),
         userRegistration: Joi.boolean().optional(),
         emailNotification: Joi.boolean().optional(),
@@ -68,6 +70,11 @@ export const updatePlatformSettingsSchema = Joi.object({
             email1: Joi.string().email().trim().optional().allow(""),
             email2: Joi.string().email().trim().optional().allow(""),
         }).optional(),
+        workingHours: Joi.object({
+            line1: Joi.string().trim().optional().allow(""),
+            line2: Joi.string().trim().optional().allow(""),
+        }).optional(),
+        helpCenterUrl: Joi.string().trim().optional().allow(""),
     }).optional(),
     
     // Home Page Banners

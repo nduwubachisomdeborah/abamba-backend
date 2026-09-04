@@ -391,7 +391,10 @@ class ProductService {
         // Process products to include additional data
         if (products.length > 0) {
             const platformSettings = await PlatformSettings.getInstance();
-            const isBonusActive = Boolean(platformSettings?.isBonusEventActive);
+            const isBonusActive = Boolean(
+                platformSettings?.systemPreferences?.bonusWeekEnabled ??
+                platformSettings?.isBonusEventActive
+            );
 
             const processedProducts = products.map((product) => {
                 let productObj = product.toObject();
@@ -468,7 +471,10 @@ class ProductService {
         }
 
         const platformSettings = await PlatformSettings.getInstance();
-        const isBonusActive = Boolean(platformSettings?.isBonusEventActive);
+        const isBonusActive = Boolean(
+            platformSettings?.systemPreferences?.bonusWeekEnabled ??
+            platformSettings?.isBonusEventActive
+        );
 
         // Convert to object and process variant data
         let productObj = product.toObject();
@@ -640,7 +646,10 @@ class ProductService {
         // Process products to include additional data
         if (products.length > 0) {
             const platformSettings = await PlatformSettings.getInstance();
-            const isBonusActive = Boolean(platformSettings?.isBonusEventActive);
+            const isBonusActive = Boolean(
+                platformSettings?.systemPreferences?.bonusWeekEnabled ??
+                platformSettings?.isBonusEventActive
+            );
 
             const processedProducts = products.map((product) => {
                 let productObj = product.toObject();

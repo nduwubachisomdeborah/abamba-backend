@@ -896,6 +896,7 @@ class AdminService {
             "adminEmail",
             "supportEmail",
             "contactInfo",
+            "companyAddress",
             "timeZone",
             "logo",
             "favicon",
@@ -925,6 +926,14 @@ class AdminService {
                     {}),
                 ...updateData.systemPreferences,
             };
+            if (updateData.systemPreferences.bonusWeekEnabled !== undefined) {
+                settings.isBonusEventActive = updateData.systemPreferences.bonusWeekEnabled;
+            }
+        }
+
+        if (updateData.isBonusEventActive !== undefined) {
+            if (!settings.systemPreferences) settings.systemPreferences = {};
+            settings.systemPreferences.bonusWeekEnabled = updateData.isBonusEventActive;
         }
 
         if (updateData.security) {
@@ -995,6 +1004,14 @@ class AdminService {
                     ...(existingContactUs.contactEmail || {}),
                     ...(updateData.contactUs.contactEmail || {}),
                 },
+                workingHours: {
+                    ...(existingContactUs.workingHours || {}),
+                    ...(updateData.contactUs.workingHours || {}),
+                },
+                helpCenterUrl:
+                    updateData.contactUs.helpCenterUrl !== undefined
+                        ? updateData.contactUs.helpCenterUrl
+                        : existingContactUs.helpCenterUrl,
             };
         }
 
