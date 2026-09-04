@@ -97,7 +97,21 @@ class OrderService {
             }
         }
 
-        return order;
+        const orderObj = order.toObject ? order.toObject() : { ...order };
+        const sellerObj = orderObj.seller;
+        const sellerId = (sellerObj?._id || sellerObj || "").toString();
+        const sellerName =
+            sellerObj?.business?.businessName ||
+            sellerObj?.name ||
+            "Verified Merchant";
+
+        orderObj.seller = sellerId;
+        orderObj.sellerId = sellerId;
+        orderObj.sellerName = sellerName;
+        orderObj.sellerDetails = typeof sellerObj === "object" ? sellerObj : { _id: sellerId, name: sellerName };
+        orderObj.sellerInfo = orderObj.sellerDetails;
+
+        return orderObj;
     }
 
     /**
@@ -202,10 +216,29 @@ class OrderService {
                 select: "name sku images basePrice category brand",
             });
 
+        // Process orders to ensure seller is string ID for frontend .slice() while preserving sellerDetails
+        const processedOrders = orders.map((order) => {
+            const orderObj = order.toObject ? order.toObject() : { ...order };
+            const sellerObj = orderObj.seller;
+            const sellerId = (sellerObj?._id || sellerObj || "").toString();
+            const sellerName =
+                sellerObj?.business?.businessName ||
+                sellerObj?.name ||
+                "Verified Merchant";
+
+            orderObj.seller = sellerId;
+            orderObj.sellerId = sellerId;
+            orderObj.sellerName = sellerName;
+            orderObj.sellerDetails = typeof sellerObj === "object" ? sellerObj : { _id: sellerId, name: sellerName };
+            orderObj.sellerInfo = orderObj.sellerDetails;
+
+            return orderObj;
+        });
+
         // Generate pagination metadata
         const pagination = PaginationUtil.getPaginationData(total, page, limit);
 
-        return { orders, pagination };
+        return { orders: processedOrders, pagination };
     }
 
     /**
