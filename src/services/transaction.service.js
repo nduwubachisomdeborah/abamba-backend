@@ -15,12 +15,13 @@ class TransactionService {
         const { amount, description } = payoutData;
 
         // Validate user exists and is a seller
-        const user = await User.findById(userId).select("+bank");
+        const user = await User.findById(userId);
         if (!user) {
             throw new AppError("User not found", 404);
         }
 
-        if (user.role !== "seller") {
+        const isSeller = user.role === "seller" || user.roles?.includes("seller");
+        if (!isSeller) {
             throw new AppError("Only sellers can request payouts", 403);
         }
 
@@ -142,12 +143,19 @@ class TransactionService {
 
         if (status === "completed") {
             try {
-                const user = await User.findById(transaction.user).select(
-                    "name email bank business",
-                );
+                const user = await User.findById(transaction.user);
 
-                if (!user || user.role !== "seller") {
+                if (!user) {
                     throw new AppError("Seller user not found", 404);
+                }
+
+                const isSeller =
+                    user.role === "seller" ||
+                    user.roles?.includes("seller") ||
+                    transaction.type === "payout";
+
+                if (!isSeller) {
+                    throw new AppError("Only seller payouts can be processed", 400);
                 }
 
                 // Retrieve bank details from user profile or transaction snapshot
