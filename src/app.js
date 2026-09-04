@@ -91,37 +91,35 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 const morganFormat = process.env.NODE_ENV === "production" ? "combined" : "dev";
 app.use(morgan(morganFormat));
 
-// Connect to database with high-performance connection pool
+// Connect to database with resilient options and auto-retry
 const mongooseOptions = {
     maxPoolSize: parseInt(process.env.MONGODB_MAX_POOL_SIZE || "50", 10),
     minPoolSize: parseInt(process.env.MONGODB_MIN_POOL_SIZE || "10", 10),
     socketTimeoutMS: 45000,
-    serverSelectionTimeoutMS: 10000,
-    family: 4, // IPv4 lookup for faster DNS
+    serverSelectionTimeoutMS: 30000,
+    connectTimeoutMS: 30000,
+    heartbeatFrequencyMS: 10000,
+    family: 4,
 };
 
-// Fallback to MongoDB Atlas if local URI points to unresolvable Docker hostname
-const ATLAS_FALLBACK_URI =
-    "mongodb+srv://deborahchisom033_db_user:0ynecEkLv2ImlVqz@cluster0.xplxdhx.mongodb.net/abamba";
+// Primary and Direct ReplicaSet URIs for MongoDB Atlas
+const ATLAS_SRV_URI =
+    "mongodb+srv://deborahchisom033_db_user:0ynecEkLv2ImlVqz@cluster0.xplxdhx.mongodb.net/abamba?retryWrites=true&w=majority";
+const ATLAS_DIRECT_URI =
+    "mongodb://deborahchisom033_db_user:0ynecEkLv2ImlVqz@ac-fsqpvbf-shard-00-00.xplxdhx.mongodb.net:27017,ac-fsqpvbf-shard-00-01.xplxdhx.mongodb.net:27017,ac-fsqpvbf-shard-00-02.xplxdhx.mongodb.net:27017/abamba?ssl=true&replicaSet=atlas-m4jwd9-shard-0&authSource=admin&retryWrites=true&w=majority";
 
-let connectionUri = process.env.MONGODB_URI || ATLAS_FALLBACK_URI;
+let connectionUri = process.env.MONGODB_URI || ATLAS_SRV_URI;
 if (connectionUri.includes("@mongo:") || connectionUri.includes("//mongo:")) {
-    connectionUri = ATLAS_FALLBACK_URI;
+    connectionUri = ATLAS_SRV_URI;
 }
 
-// Ensure MongoDB SRV records resolve reliably across Windows and cloud networks
-if (connectionUri.startsWith("mongodb+srv")) {
+const connectWithRetry = async (retryCount = 0) => {
     try {
-        dns.setServers(["8.8.8.8", "1.1.1.1"]);
-    } catch (dnsErr) {
-        console.warn("Could not set DNS servers:", dnsErr.message);
-    }
-}
-
-mongoose
-    .connect(connectionUri, mongooseOptions)
-    .then((mon) => {
+        const uriToUse = retryCount > 0 ? ATLAS_DIRECT_URI : connectionUri;
+        console.log(`Connecting to MongoDB... (attempt ${retryCount + 1})`);
+        await mongoose.connect(uriToUse, mongooseOptions);
         console.log("✅ Connected to MongoDB with Connection Pool (maxPoolSize: 50)");
+
         // Initialize category options after database connection
         initializeCategoryOptions();
         initializeStoreLocations();
@@ -139,8 +137,17 @@ mongoose
         setInterval(() => {
             paymentService.reconcilePendingPayments().catch(() => {});
         }, 45 * 1000);
-    })
-    .catch((err) => console.error("Could not connect to MongoDB", err));
+    } catch (err) {
+        console.error(`Could not connect to MongoDB (attempt ${retryCount + 1}):`, err.message);
+        if (retryCount < 5) {
+            const delay = Math.min(5000 * (retryCount + 1), 15000);
+            console.log(`Retrying MongoDB connection in ${delay / 1000}s...`);
+            setTimeout(() => connectWithRetry(retryCount + 1), delay);
+        }
+    }
+};
+
+connectWithRetry();
 
 // Register versioned routes
 app.use("/api/v1", v1Routes);
