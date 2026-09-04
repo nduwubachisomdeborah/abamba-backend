@@ -1,5 +1,6 @@
 import { Router } from "express";
 import AuthController from "../../controllers/auth.controller.js";
+import UserController from "../../controllers/user.controller.js";
 import {
     signupSchema,
     loginSchema,
@@ -39,5 +40,8 @@ router.post("/verify-otp", validate(verifyOTPSchema), AuthController.verifyOTP);
 
 // Protected routes (require authentication)
 router.post("/switch-role", authenticate, AuthController.switchRole);
+router.get("/me", authenticate, UserController.getMe);
+router.get("/profile", authenticate, UserController.getMe);
+router.get("/user", authenticate, UserController.getMe);
 
 export default router;
