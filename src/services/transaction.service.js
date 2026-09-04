@@ -15,7 +15,7 @@ class TransactionService {
         const { amount, description } = payoutData;
 
         // Validate user exists and is a seller
-        const user = await User.findById(userId).select("+bank +bank.bvn");
+        const user = await User.findById(userId).select("+bank");
         if (!user) {
             throw new AppError("User not found", 404);
         }
@@ -81,7 +81,7 @@ class TransactionService {
             type: "payout",
             status: "pending",
         })
-            .populate("user", "name email phoneNumber business +bank")
+            .populate("user", "name email phoneNumber business bank")
             .sort({ createdAt: -1 });
     }
 
@@ -107,7 +107,7 @@ class TransactionService {
         }
 
         return await Transaction.find(query)
-            .populate("user", "name email phoneNumber business +bank")
+            .populate("user", "name email phoneNumber business bank")
             .sort({ createdAt: -1 });
     }
 
@@ -143,7 +143,7 @@ class TransactionService {
         if (status === "completed") {
             try {
                 const user = await User.findById(transaction.user).select(
-                    "+bank +bank.bvn name email",
+                    "name email bank business",
                 );
 
                 if (!user || user.role !== "seller") {

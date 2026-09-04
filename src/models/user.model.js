@@ -283,7 +283,6 @@ const userSchema = new mongoose.Schema(
         bank: {
             type: bankSchema,
             default: null,
-            select: false,
         },
         isGuest: {
             type: Boolean,

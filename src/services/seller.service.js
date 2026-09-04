@@ -552,7 +552,7 @@ class SellerService {
             _id: id,
             role: "seller",
         })
-            .select("+bank +bank.bvn")
+            .select("+bank")
             .populate({
                 path: "business",
                 populate: [
