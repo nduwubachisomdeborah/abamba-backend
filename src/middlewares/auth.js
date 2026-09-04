@@ -42,7 +42,15 @@ const extractAndVerifyToken = asyncHandler(async (req, res, next) => {
 
         // If not in cache, fetch from database and cache the result
         if (!currentUser) {
-            currentUser = await User.findById(decoded.id).populate("business");
+            currentUser = await User.findById(decoded.id)
+                .select("+business +bank")
+                .populate({
+                    path: "business",
+                    populate: [
+                        { path: "personalDocument", model: "File" },
+                        { path: "businessDocument", model: "File" },
+                    ],
+                });
 
             // Check if user still exists
             if (!currentUser) {
@@ -115,7 +123,22 @@ export const sessionAuthenticate = asyncHandler(async (req, res, next) => {
 // Middleware to restrict access to certain roles
 export const restrictTo = (...roles) => {
     return (req, res, next) => {
-        if (!roles.includes(req.user.role)) {
+        const userRole = req.user?.role;
+        const userRoles = Array.isArray(req.user?.roles) ? req.user.roles : [];
+
+        const hasRole =
+            roles.includes(userRole) ||
+            (userRole === "user" && (roles.includes("buyer") || roles.includes("customer"))) ||
+            (userRole === "buyer" && roles.includes("user")) ||
+            userRoles.some((r) => {
+                if (roles.includes(r)) return true;
+                if ((r === "buyer" || r === "customer") && roles.includes("user")) return true;
+                if (r === "user" && (roles.includes("buyer") || roles.includes("customer"))) return true;
+                return false;
+            }) ||
+            (roles.includes("seller") && (req.user?.business?.approved || req.user?.business?.businessName));
+
+        if (!hasRole) {
             return next(
                 new AppError(
                     "You do not have permission to perform this action",
@@ -130,7 +153,12 @@ export const restrictTo = (...roles) => {
 // Middleware to restrict access to verified sellers
 export const verifiedSellerOnly = asyncHandler(async (req, res, next) => {
     authenticate(req, res, () => {
-        if (req.user?.role !== "seller" || !req.user?.business?.approved) {
+        const isSeller =
+            req.user?.role === "seller" ||
+            req.user?.roles?.includes("seller") ||
+            Boolean(req.user?.business);
+
+        if (!isSeller || !req.user?.business?.approved) {
             return next(
                 new AppError(
                     "You do not have permission to perform this action. Please verify your business first.",

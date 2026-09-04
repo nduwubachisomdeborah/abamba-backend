@@ -100,17 +100,7 @@ class SettingsController {
         return res.status(200).json({
             status: "success",
             success: true,
-            data: {
-                platformName: settings.platformName,
-                isBonusEventActive: Boolean(
-                    settings.systemPreferences?.bonusWeekEnabled ?? settings.isBonusEventActive
-                ),
-                contactInfo: settings.contactInfo,
-                supportEmail: settings.supportEmail,
-                logo: settings.logo,
-                favicon: settings.favicon,
-                homePage: settings.homePage,
-            },
+            data: settings,
         });
     });
 }

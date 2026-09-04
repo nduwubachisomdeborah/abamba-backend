@@ -10,9 +10,30 @@ router.get("/platform", SettingsController.getPlatformSettings);
 router.get("/promotions", SettingsController.getPromotionsStatus);
 router.get("/", SettingsController.getPublicSettings);
 
-// PATCH settings MUST be protected for Admin only
+// PATCH & PUT settings MUST be protected for Admin only
 router.patch(
     "/platform",
+    authenticate,
+    adminOnly,
+    validateUpdatePlatformSettings,
+    SettingsController.updatePlatformSettings
+);
+router.put(
+    "/platform",
+    authenticate,
+    adminOnly,
+    validateUpdatePlatformSettings,
+    SettingsController.updatePlatformSettings
+);
+router.patch(
+    "/",
+    authenticate,
+    adminOnly,
+    validateUpdatePlatformSettings,
+    SettingsController.updatePlatformSettings
+);
+router.put(
+    "/",
     authenticate,
     adminOnly,
     validateUpdatePlatformSettings,
@@ -21,6 +42,12 @@ router.patch(
 
 // Admin protected route for toggling promotions
 router.patch(
+    "/promotions",
+    authenticate,
+    adminOnly,
+    SettingsController.toggleBonusEvent
+);
+router.put(
     "/promotions",
     authenticate,
     adminOnly,

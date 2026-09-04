@@ -12,6 +12,15 @@ export const updatePlatformSettingsSchema = Joi.object({
     logo: Joi.string().uri().trim().optional().allow(""),
     favicon: Joi.string().uri().trim().optional().allow(""),
     isBonusEventActive: Joi.boolean().optional(),
+    bonusWeekEnabled: Joi.boolean().optional(),
+    multiLanguageSupport: Joi.boolean().optional(),
+    maintenanceMode: Joi.boolean().optional(),
+    userRegistration: Joi.boolean().optional(),
+    emailNotification: Joi.boolean().optional(),
+    sessionTimeout: Joi.number().min(1).max(100000).optional(),
+    twoFactorAuthentication: Joi.boolean().optional(),
+    minimumLength: Joi.number().min(1).max(100).optional(),
+    requireSpecialCharacters: Joi.boolean().optional(),
     
     // Social Media Links
     socialMedia: Joi.object({
@@ -19,7 +28,7 @@ export const updatePlatformSettingsSchema = Joi.object({
         twitterUrl: Joi.string().uri().trim().optional().allow(""),
         linkedinUrl: Joi.string().uri().trim().optional().allow(""),
         instagramUrl: Joi.string().uri().trim().optional().allow(""),
-    }).optional(),
+    }).optional().unknown(true),
     
     // System Preferences
     systemPreferences: Joi.object({
@@ -28,17 +37,17 @@ export const updatePlatformSettingsSchema = Joi.object({
         userRegistration: Joi.boolean().optional(),
         emailNotification: Joi.boolean().optional(),
         multiLanguageSupport: Joi.boolean().optional(),
-    }).optional(),
+    }).optional().unknown(true),
     
     // Security & Configurations
     security: Joi.object({
         passwordPolicy: Joi.object({
-            minimumLength: Joi.number().min(6).max(32).optional(),
+            minimumLength: Joi.number().min(1).max(100).optional(),
             requireSpecialCharacters: Joi.boolean().optional(),
-        }).optional(),
-        sessionTimeout: Joi.number().min(5).max(1440).optional(),
+        }).optional().unknown(true),
+        sessionTimeout: Joi.number().min(1).max(100000).optional(),
         twoFactorAuthentication: Joi.boolean().optional(),
-    }).optional(),
+    }).optional().unknown(true),
     
     // Legal Documents
     termsOfUse: Joi.object({
@@ -86,7 +95,7 @@ export const updatePlatformSettingsSchema = Joi.object({
                     bannerUrl: Joi.string().trim().uri().optional().allow(""),
                     order: Joi.number().integer().min(0).optional(),
                     isActive: Joi.boolean().optional(),
-                })
+                }).unknown(true)
             )
             .optional(),
         featuredBanners: Joi.array()
@@ -96,11 +105,11 @@ export const updatePlatformSettingsSchema = Joi.object({
                     bannerUrl: Joi.string().trim().uri().optional().allow(""),
                     order: Joi.number().integer().min(0).optional(),
                     isActive: Joi.boolean().optional(),
-                })
+                }).unknown(true)
             )
             .optional(),
-    }).optional(),
-});
+    }).optional().unknown(true),
+}).unknown(true);
 
 export const validateUpdatePlatformSettings = validate(
     updatePlatformSettingsSchema

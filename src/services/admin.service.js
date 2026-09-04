@@ -909,6 +909,57 @@ class AdminService {
             }
         });
 
+        // Handle flat promotional flags
+        if (updateData.bonusWeekEnabled !== undefined) {
+            settings.isBonusEventActive = updateData.bonusWeekEnabled;
+            if (!settings.systemPreferences) settings.systemPreferences = {};
+            settings.systemPreferences.bonusWeekEnabled = updateData.bonusWeekEnabled;
+        }
+
+        if (updateData.isBonusEventActive !== undefined) {
+            settings.isBonusEventActive = updateData.isBonusEventActive;
+            if (!settings.systemPreferences) settings.systemPreferences = {};
+            settings.systemPreferences.bonusWeekEnabled = updateData.isBonusEventActive;
+        }
+
+        // Handle flat system preferences
+        if (updateData.multiLanguageSupport !== undefined) {
+            if (!settings.systemPreferences) settings.systemPreferences = {};
+            settings.systemPreferences.multiLanguageSupport = updateData.multiLanguageSupport;
+        }
+        if (updateData.maintenanceMode !== undefined) {
+            if (!settings.systemPreferences) settings.systemPreferences = {};
+            settings.systemPreferences.maintenanceMode = updateData.maintenanceMode;
+        }
+        if (updateData.userRegistration !== undefined) {
+            if (!settings.systemPreferences) settings.systemPreferences = {};
+            settings.systemPreferences.userRegistration = updateData.userRegistration;
+        }
+        if (updateData.emailNotification !== undefined) {
+            if (!settings.systemPreferences) settings.systemPreferences = {};
+            settings.systemPreferences.emailNotification = updateData.emailNotification;
+        }
+
+        // Handle flat security fields
+        if (updateData.sessionTimeout !== undefined) {
+            if (!settings.security) settings.security = {};
+            settings.security.sessionTimeout = Number(updateData.sessionTimeout);
+        }
+        if (updateData.twoFactorAuthentication !== undefined) {
+            if (!settings.security) settings.security = {};
+            settings.security.twoFactorAuthentication = Boolean(updateData.twoFactorAuthentication);
+        }
+        if (updateData.minimumLength !== undefined || updateData.requireSpecialCharacters !== undefined) {
+            if (!settings.security) settings.security = {};
+            if (!settings.security.passwordPolicy) settings.security.passwordPolicy = {};
+            if (updateData.minimumLength !== undefined) {
+                settings.security.passwordPolicy.minimumLength = Number(updateData.minimumLength);
+            }
+            if (updateData.requireSpecialCharacters !== undefined) {
+                settings.security.passwordPolicy.requireSpecialCharacters = Boolean(updateData.requireSpecialCharacters);
+            }
+        }
+
         // Update nested objects (merge with existing values)
         if (updateData.socialMedia) {
             settings.socialMedia = {
@@ -929,11 +980,6 @@ class AdminService {
             if (updateData.systemPreferences.bonusWeekEnabled !== undefined) {
                 settings.isBonusEventActive = updateData.systemPreferences.bonusWeekEnabled;
             }
-        }
-
-        if (updateData.isBonusEventActive !== undefined) {
-            if (!settings.systemPreferences) settings.systemPreferences = {};
-            settings.systemPreferences.bonusWeekEnabled = updateData.isBonusEventActive;
         }
 
         if (updateData.security) {

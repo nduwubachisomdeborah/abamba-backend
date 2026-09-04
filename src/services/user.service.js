@@ -16,7 +16,15 @@ class UserService {
      * @returns {Promise<Object>} User object
      */
     async getUserById(id) {
-        const user = await User.findById(id);
+        const user = await User.findById(id)
+            .select("+business +bank")
+            .populate({
+                path: "business",
+                populate: [
+                    { path: "personalDocument", model: "File" },
+                    { path: "businessDocument", model: "File" },
+                ],
+            });
         if (!user) {
             throw new AppError("User not found", 404);
         }

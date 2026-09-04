@@ -28,6 +28,7 @@ import {
     validateCreateStoreLocation,
     validateUpdateStoreLocation,
 } from "../../validators/admin.storeLocation.validator.js";
+import SettingsController from "../../controllers/settings.controller.js";
 import {
     getAllCompanies,
     getShippingStats,
@@ -362,6 +363,38 @@ router.patch(
     authenticate,
     adminOnly,
     updateCompany,
+);
+
+// Platform Settings routes for Admin Dashboard
+router.get("/settings", SettingsController.getPlatformSettings);
+router.get("/settings/platform", SettingsController.getPlatformSettings);
+router.patch(
+    "/settings",
+    authenticate,
+    adminOnly,
+    validateUpdatePlatformSettings,
+    SettingsController.updatePlatformSettings,
+);
+router.patch(
+    "/settings/platform",
+    authenticate,
+    adminOnly,
+    validateUpdatePlatformSettings,
+    SettingsController.updatePlatformSettings,
+);
+router.put(
+    "/settings",
+    authenticate,
+    adminOnly,
+    validateUpdatePlatformSettings,
+    SettingsController.updatePlatformSettings,
+);
+router.put(
+    "/settings/platform",
+    authenticate,
+    adminOnly,
+    validateUpdatePlatformSettings,
+    SettingsController.updatePlatformSettings,
 );
 
 export default router;

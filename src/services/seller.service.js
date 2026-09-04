@@ -548,11 +548,8 @@ class SellerService {
     };
 
     getUserById = async (id) => {
-        const user = await User.findOne({
-            _id: id,
-            role: "seller",
-        })
-            .select("+bank")
+        const user = await User.findById(id)
+            .select("+bank +business")
             .populate({
                 path: "business",
                 populate: [

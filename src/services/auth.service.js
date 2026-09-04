@@ -663,7 +663,16 @@ class AuthService {
      * @returns {Promise<Object>} Updated user and refreshed JWT token
      */
     async switchRole(userId, targetRole) {
-        const user = await User.findById(userId);
+        const user = await User.findById(userId)
+            .select("+business +bank")
+            .populate({
+                path: "business",
+                populate: [
+                    { path: "personalDocument", model: "File" },
+                    { path: "businessDocument", model: "File" },
+                ],
+            });
+
         if (!user) {
             throw new AppError("User not found", 404);
         }
@@ -683,6 +692,13 @@ class AuthService {
             !user.roles.includes(normalizedRole)
         ) {
             user.roles.push(roleLabel);
+        }
+
+        if (
+            (normalizedRole === "seller" || user.business?.approved || user.business?.businessName) &&
+            !user.roles.includes("seller")
+        ) {
+            user.roles.push("seller");
         }
 
         user.role = normalizedRole;
