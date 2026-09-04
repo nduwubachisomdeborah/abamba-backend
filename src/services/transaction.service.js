@@ -80,7 +80,9 @@ class TransactionService {
             user: userId,
             type: "payout",
             status: "pending",
-        }).sort({ createdAt: -1 });
+        })
+            .populate("user", "name email phoneNumber business +bank")
+            .sort({ createdAt: -1 });
     }
 
     /**
@@ -104,7 +106,9 @@ class TransactionService {
             query.status = filters.status;
         }
 
-        return await Transaction.find(query).sort({ createdAt: -1 });
+        return await Transaction.find(query)
+            .populate("user", "name email phoneNumber business +bank")
+            .sort({ createdAt: -1 });
     }
 
     /**
@@ -115,13 +119,21 @@ class TransactionService {
      * @returns {Promise<Object>} Updated transaction
      */
     async processPayout(transactionId, status, additionalData = {}) {
-        const transaction = await Transaction.findById(transactionId);
+        let transaction;
+        if (transactionId && typeof transactionId === "string" && transactionId.match(/^[0-9a-fA-F]{24}$/)) {
+            transaction = await Transaction.findById(transactionId);
+        }
+        if (!transaction) {
+            transaction = await Transaction.findOne({
+                $or: [{ reference: transactionId }, { transactionId: transactionId }],
+            });
+        }
         if (!transaction) {
             throw new AppError("Transaction not found", 404);
         }
 
         if (transaction.status !== "pending") {
-            throw new AppError("Transaction is not in pending status", 400);
+            throw new AppError(`Transaction is already ${transaction.status}`, 400);
         }
 
         if (!["completed", "failed"].includes(status)) {
@@ -131,16 +143,60 @@ class TransactionService {
         if (status === "completed") {
             try {
                 const user = await User.findById(transaction.user).select(
-                    "+bank +bank.bvn",
+                    "+bank +bank.bvn name email",
                 );
 
                 if (!user || user.role !== "seller") {
-                    throw new AppError("User not found", 404);
+                    throw new AppError("Seller user not found", 404);
                 }
 
-                if (!user.bank) {
+                // Retrieve bank details from user profile or transaction snapshot
+                let accountName =
+                    user.bank?.accountName ||
+                    transaction.accountDetails?.accountName ||
+                    user.name;
+                let accountNumber =
+                    user.bank?.accountNumber ||
+                    transaction.accountDetails?.accountNumber;
+                let bankCode =
+                    user.bank?.bankCode ||
+                    transaction.accountDetails?.bankCode;
+                let bankName =
+                    user.bank?.bankName ||
+                    transaction.accountDetails?.bankName;
+
+                // Auto-resolve bank code by bank name if bankCode is missing
+                if (!bankCode && bankName) {
+                    try {
+                        const bankListRes = await PaystackService.getBankList();
+                        const banks = bankListRes?.data || [];
+                        const cleanBankName = bankName
+                            .toLowerCase()
+                            .replace(/bank|plc|limited|ltd/g, "")
+                            .trim();
+                        const found = banks.find((b) => {
+                            const cleanName = b.name
+                                .toLowerCase()
+                                .replace(/bank|plc|limited|ltd/g, "")
+                                .trim();
+                            return (
+                                cleanName === cleanBankName ||
+                                b.name.toLowerCase().includes(cleanBankName) ||
+                                cleanBankName.includes(cleanName)
+                            );
+                        });
+                        if (found) {
+                            bankCode = found.code;
+                            console.log(`[Paystack] Auto-resolved bank code for ${bankName}: ${bankCode}`);
+                        }
+                    } catch (lookupErr) {
+                        console.error("[Paystack] Bank lookup failed:", lookupErr?.message);
+                    }
+                }
+
+                if (!accountNumber || !bankCode) {
                     throw new AppError(
-                        "Bank account not found. Please add your bank details before requesting a payout",
+                        "Seller bank account details (account number or bank code) are missing or incomplete. Please ensure the seller has saved their bank account.",
                         400,
                     );
                 }
@@ -148,21 +204,19 @@ class TransactionService {
                 // 1. Create Transfer Recipient
                 const recipient = await PaystackService.createTransferRecipient(
                     {
-                        name: user.bank.accountName,
-                        accountNumber: user.bank.accountNumber,
-                        bankCode: user.bank.bankCode,
+                        name: accountName,
+                        accountNumber: String(accountNumber),
+                        bankCode: String(bankCode),
                         currency: "NGN",
                         type: "nuban",
                     },
                 );
 
-                console.log({ recipient });
-
                 if (!recipient.status) {
                     throw new AppError(
                         "Failed to create transfer recipient: " +
                             recipient.message,
-                        500,
+                        400,
                     );
                 }
 
@@ -170,16 +224,14 @@ class TransactionService {
                 const transfer = await PaystackService.initiateTransfer({
                     amount: transaction.amount,
                     recipient: recipient.data.recipient_code,
-                    reason: transaction.description || "Abamba Payout",
+                    reason: transaction.description || "Abamba Seller Payout",
                     reference: transaction.reference,
                 });
-
-                console.log({ transfer });
 
                 if (!transfer.status) {
                     throw new AppError(
                         "Failed to initiate transfer: " + transfer.message,
-                        500,
+                        400,
                     );
                 }
 
@@ -192,33 +244,42 @@ class TransactionService {
                     paystackTransfer: transfer.data,
                 };
 
-                // Remove from pending balance since payout is complete
-                await User.findByIdAndUpdate(transaction.user, {
-                    $inc: {
-                        "wallet.pendingBalance": -transaction.amount,
-                    },
-                });
+                // Remove from pending balance safely
+                const sellerUser = await User.findById(transaction.user);
+                if (sellerUser && sellerUser.wallet) {
+                    sellerUser.wallet.pendingBalance = Math.max(
+                        0,
+                        (Number(sellerUser.wallet.pendingBalance) || 0) - transaction.amount,
+                    );
+                    await sellerUser.save();
+                }
             } catch (error) {
-                console.log(error?.response?.data);
-                // If Paystack processing fails, keep as pending or mark failed?
-                // For now, let's propagate the error so admin knows it failed
-                throw new AppError(
-                    error.message || "Payout processing failed",
-                    500,
-                );
+                console.error("[processPayout] Paystack Error:", error?.response?.data || error.message);
+                const errorMsg =
+                    error.response?.data?.message ||
+                    error.message ||
+                    "Payout processing failed";
+                throw new AppError(errorMsg, 400);
             }
         } else if (status === "failed") {
             transaction.status = "failed";
-            transaction.failureReason = additionalData.failureReason;
+            transaction.failureReason = additionalData.failureReason || "Rejected by admin";
             transaction.processedAt = new Date();
 
             // Return amount back to balance and remove from pending
-            await User.findByIdAndUpdate(transaction.user, {
-                $inc: {
-                    "wallet.balance": transaction.amount,
-                    "wallet.pendingBalance": -transaction.amount,
-                },
-            });
+            const sellerUser = await User.findById(transaction.user);
+            if (sellerUser) {
+                if (!sellerUser.wallet) {
+                    sellerUser.wallet = { balance: 0, pendingBalance: 0, holdBalance: 0 };
+                }
+                sellerUser.wallet.balance =
+                    (Number(sellerUser.wallet.balance) || 0) + transaction.amount;
+                sellerUser.wallet.pendingBalance = Math.max(
+                    0,
+                    (Number(sellerUser.wallet.pendingBalance) || 0) - transaction.amount,
+                );
+                await sellerUser.save();
+            }
         }
 
         await transaction.save();

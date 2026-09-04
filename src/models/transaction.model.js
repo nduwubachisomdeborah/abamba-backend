@@ -35,8 +35,9 @@ const transactionSchema = new mongoose.Schema(
             bankName: String,
             accountNumber: String,
             accountName: String,
+            bankCode: String,
+            bvn: String,
             paypalEmail: String,
-            // Add other payment method details as needed
         },
         reference: {
             type: String,
