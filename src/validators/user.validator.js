@@ -101,12 +101,16 @@ export const updatePasswordSchema = Joi.object({
 
 // Schema for payout request
 export const payoutRequestSchema = Joi.object({
-    amount: Joi.number().required().min(100).messages({
+    amount: Joi.number().required().min(1).messages({
         "number.base": "Amount must be a number",
-        "number.min": "Amount must be at least 100",
+        "number.min": "Amount must be at least 1",
         "any.required": "Amount is required",
     }),
-});
+    description: Joi.string().trim().optional().allow(""),
+    note: Joi.string().trim().optional().allow(""),
+    notes: Joi.string().trim().optional().allow(""),
+    narration: Joi.string().trim().optional().allow(""),
+}).unknown(true);
 
 // Export schemas directly to use with validate middleware in routes
 // Example usage: router.post('/users', validate(createUserSchema), UserController.createUser);

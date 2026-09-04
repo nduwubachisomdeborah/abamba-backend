@@ -248,12 +248,19 @@ class OrderService {
         if (status === "delivered" && order.sellerWalletStatus === "pending") {
             const creditAmount = Number(order.subtotal || 0);
             if (order.seller && creditAmount > 0) {
-                await User.findByIdAndUpdate(order.seller, {
-                    $inc: {
-                        "wallet.balance": creditAmount,
-                        "wallet.pendingBalance": -creditAmount,
-                    },
-                });
+                const sellerUser = await User.findById(order.seller);
+                if (sellerUser) {
+                    if (!sellerUser.wallet) {
+                        sellerUser.wallet = { balance: 0, pendingBalance: 0, holdBalance: 0 };
+                    }
+                    sellerUser.wallet.balance =
+                        (Number(sellerUser.wallet.balance) || 0) + creditAmount;
+                    sellerUser.wallet.pendingBalance = Math.max(
+                        0,
+                        (Number(sellerUser.wallet.pendingBalance) || 0) - creditAmount,
+                    );
+                    await sellerUser.save();
+                }
                 order.sellerWalletStatus = "paid";
                 await notificationService.send(
                     order.seller,

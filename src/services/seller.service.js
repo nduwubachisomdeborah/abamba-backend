@@ -548,7 +548,7 @@ class SellerService {
     };
 
     getUserById = async (id) => {
-        return await User.findOne({
+        const user = await User.findOne({
             _id: id,
             role: "seller",
         })
@@ -560,6 +560,36 @@ class SellerService {
                     { path: "businessDocument", model: "File" },
                 ],
             });
+
+        if (user && user.wallet) {
+            let changed = false;
+            if (user.wallet.pendingBalance < 0) {
+                user.wallet.pendingBalance = 0;
+                changed = true;
+            }
+            if (user.wallet.balance < 0) {
+                user.wallet.balance = 0;
+                changed = true;
+            }
+            if (user.wallet.holdBalance < 0) {
+                user.wallet.holdBalance = 0;
+                changed = true;
+            }
+            if (changed) {
+                await User.updateOne(
+                    { _id: id },
+                    {
+                        $set: {
+                            "wallet.pendingBalance": Math.max(0, user.wallet.pendingBalance || 0),
+                            "wallet.balance": Math.max(0, user.wallet.balance || 0),
+                            "wallet.holdBalance": Math.max(0, user.wallet.holdBalance || 0),
+                        },
+                    }
+                );
+            }
+        }
+
+        return user;
     };
 
     // Get comprehensive store statistics for a seller

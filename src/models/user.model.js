@@ -390,6 +390,12 @@ userSchema.post("updateMany", async function () {
 });
 
 userSchema.pre("save", async function (next) {
+    if (this.wallet) {
+        if (this.wallet.pendingBalance < 0) this.wallet.pendingBalance = 0;
+        if (this.wallet.balance < 0) this.wallet.balance = 0;
+        if (this.wallet.holdBalance < 0) this.wallet.holdBalance = 0;
+    }
+
     // Only hash the password if it has been modified (or is new)
     if (!this.isModified("password")) {
         return next();

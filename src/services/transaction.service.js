@@ -15,7 +15,7 @@ class TransactionService {
         const { amount, description } = payoutData;
 
         // Validate user exists and is a seller
-        const user = await User.findById(userId).populate("bank");
+        const user = await User.findById(userId).select("+bank +bank.bvn");
         if (!user) {
             throw new AppError("User not found", 404);
         }
@@ -130,8 +130,8 @@ class TransactionService {
 
         if (status === "completed") {
             try {
-                const user = await User.findById(transaction.user).populate(
-                    "bank",
+                const user = await User.findById(transaction.user).select(
+                    "+bank +bank.bvn",
                 );
 
                 if (!user || user.role !== "seller") {
