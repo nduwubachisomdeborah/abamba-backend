@@ -90,6 +90,18 @@ export const createOrderSchema = Joi.object({
         "string.uri": "Callback URL must be a valid URL",
         "string.max": "Callback URL cannot exceed 500 characters",
     }),
+    fulfillmentType: Joi.string()
+        .valid("delivery", "pickup_station")
+        .default("delivery")
+        .optional(),
+    isPickupStation: Joi.boolean().optional(),
+    pickupStation: Joi.object({
+        address: Joi.string().allow("", null).optional(),
+        customerPhone: Joi.string().allow("", null).optional(),
+        supportPhone: Joi.string().allow("", null).optional(),
+        timeline: Joi.string().allow("", null).optional(),
+        fee: Joi.number().min(0).optional(),
+    }).unknown(true).optional(),
     carrierId: Joi.string().allow("", null).optional(),
     courierId: Joi.string().allow("", null).optional(),
     courierName: Joi.string().allow("", null).optional(),

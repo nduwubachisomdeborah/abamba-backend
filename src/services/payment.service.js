@@ -164,26 +164,31 @@ class PaymentService {
             };
             addressId = savedAddress._id || orderData.addressId;
         } else {
+            const isPickup = Boolean(
+                orderData.isPickupStation === true ||
+                orderData.fulfillmentType === "pickup_station" ||
+                orderData.isPickup === true
+            );
             const defaultAddress =
                 user.addresses?.find((a) => a.isDefault) || user.addresses?.[0];
-            if (!defaultAddress) {
+            if (!defaultAddress && !isPickup) {
                 throw new AppError(
                     "Shipping address is required to place an order.",
                     400,
                 );
             }
             finalShippingAddress = {
-                fullName: defaultAddress.fullName || user.name || "Customer",
-                addressLine1: defaultAddress.addressLine1 || "Delivery Address",
-                addressLine2: defaultAddress.addressLine2 || "",
-                city: defaultAddress.city || "City",
-                state: defaultAddress.state || "State",
-                zipCode: defaultAddress.zipCode || "460281",
-                country: defaultAddress.country || "NG",
-                phoneNumber: defaultAddress.phoneNumber || user.phoneNumber || user.phone || "08000000000",
-                coordinates: defaultAddress.coordinates,
+                fullName: defaultAddress?.fullName || user.name || "Customer",
+                addressLine1: defaultAddress?.addressLine1 || (isPickup ? "ANGELINA HOUSE, 31 WETHERAL ROAD OWERRI IMO STATE NIGERIA" : "Delivery Address"),
+                addressLine2: defaultAddress?.addressLine2 || "",
+                city: defaultAddress?.city || (isPickup ? "Owerri" : "City"),
+                state: defaultAddress?.state || (isPickup ? "Imo" : "State"),
+                zipCode: defaultAddress?.zipCode || "460281",
+                country: defaultAddress?.country || "NG",
+                phoneNumber: defaultAddress?.phoneNumber || user.phoneNumber || user.phone || "08000000000",
+                coordinates: defaultAddress?.coordinates,
             };
-            addressId = defaultAddress._id;
+            addressId = defaultAddress?._id || null;
         }
 
         // Load cart
@@ -348,16 +353,33 @@ class PaymentService {
             groups.get(key).push(it);
         }
 
+        const isPickupStation = Boolean(
+            orderData.isPickupStation === true ||
+            orderData.fulfillmentType === "pickup_station" ||
+            orderData.isPickup === true
+        );
+        const fulfillmentType = isPickupStation ? "pickup_station" : (orderData.fulfillmentType || "delivery");
+
+        const pickupStationDetails = {
+            address: orderData.pickupStation?.address || "ANGELINA HOUSE, 31 WETHERAL ROAD OWERRI IMO STATE NIGERIA",
+            customerPhone: orderData.pickupStation?.customerPhone || "+2348060039760",
+            supportPhone: orderData.pickupStation?.supportPhone || "+2349077758206",
+            timeline: orderData.pickupStation?.timeline || "5 to 7 working days from payment date",
+            fee: 0,
+        };
+
         // Compute holder totals
         const holderSubtotal = enrichedItems.reduce(
             (t, it) => t + it.price * it.quantity,
             0,
         );
 
-        const shippingCost = enrichedItems.reduce(
-            (t, it) => t + it.shippingCost,
-            0,
-        );
+        const shippingCost = isPickupStation
+            ? 0
+            : enrichedItems.reduce(
+                (t, it) => t + (it.shippingCost || 0),
+                0,
+            );
         const holderTotal = holderSubtotal + shippingCost;
 
         // Check destination route
@@ -454,12 +476,14 @@ class PaymentService {
             }
         }
 
-        const deliveryFee = Number(
-            orderData.shippingFee ||
-                orderData.shippingCost ||
-                assignedCompany?.defaultBasePrice ||
-                3000,
-        );
+        const deliveryFee = isPickupStation
+            ? 0
+            : Number(
+                orderData.shippingFee ||
+                    orderData.shippingCost ||
+                    assignedCompany?.defaultBasePrice ||
+                    3000,
+            );
 
         // Create orders first
         const platformFeePercentage =
@@ -472,7 +496,9 @@ class PaymentService {
             );
             // allocate costs proportionally
             const share = holderSubtotal > 0 ? subtotal / holderSubtotal : 0;
-            const orderShipping = Number((shippingCost * share).toFixed(2)) || deliveryFee;
+            const orderShipping = isPickupStation
+                ? 0
+                : (Number((shippingCost * share).toFixed(2)) || deliveryFee);
             // Calculate platform fee from seller order subtotal
             const platformFee = Number(
                 (subtotal * (platformFeePercentage / 100)).toFixed(2),
@@ -485,13 +511,20 @@ class PaymentService {
                 items: items.map(({ seller, ...rest }) => rest),
                 shippingAddress: finalShippingAddress,
                 addressId: addressId || null,
+                fulfillmentType,
+                isPickupStation,
+                pickupStation: isPickupStation ? pickupStationDetails : undefined,
                 logistics: {
-                    courierId: assignedCompany.code || assignedCompany._id?.toString() || "courier",
-                    courierName: assignedCompany.name,
-                    courierEmail: assignedCompany.email,
-                    shippingFee: orderShipping || deliveryFee,
+                    courierId: isPickupStation
+                        ? "pickup_station"
+                        : (assignedCompany?.code || assignedCompany?._id?.toString() || "courier"),
+                    courierName: isPickupStation
+                        ? "Abamba Pick-Up Office (Owerri)"
+                        : (assignedCompany?.name || "Logistics Partner"),
+                    courierEmail: isPickupStation ? null : (assignedCompany?.email || null),
+                    shippingFee: orderShipping,
                 },
-                logisticsDispatch: assignedCompany
+                logisticsDispatch: (!isPickupStation && assignedCompany)
                     ? {
                           company: assignedCompany._id,
                           companyName: assignedCompany.name,
@@ -528,6 +561,9 @@ class PaymentService {
             payment: null,
             addressId: addressId || null,
             shippingAddress: finalShippingAddress,
+            fulfillmentType,
+            isPickupStation,
+            pickupStation: isPickupStation ? pickupStationDetails : undefined,
             method: normalizedMethod,
             provider,
             subtotal: holderSubtotal,
@@ -734,9 +770,16 @@ class PaymentService {
             await order.save();
         }
 
-        // Trigger logistics dispatch notifications and update company monthly ledger
+        // Trigger logistics dispatch notifications and update company monthly ledger (Delivery orders only)
         for (const order of orders) {
             try {
+                if (order.isPickupStation || order.fulfillmentType === "pickup_station") {
+                    console.log(
+                        `[PaymentService] Order #${order.orderId || order._id} is a Pick-Up Station order. Skipping courier dispatch notification.`,
+                    );
+                    continue;
+                }
+
                 let company = null;
                 if (order.logisticsDispatch?.company) {
                     company = await LogisticsCompany.findById(
@@ -759,7 +802,7 @@ class PaymentService {
                 }
 
                 const courierEmail =
-                    order.logistics?.courierEmail || company?.email;
+                    order.logistics?.courierEmail || company?.email || order.courierEmail;
                 const courierName =
                     order.logistics?.courierName || company?.name || "Logistics Partner";
                 const fee = Number(
@@ -816,7 +859,7 @@ class PaymentService {
 
         // Credit seller wallets (subtotal only) and notify them
         for (const order of orders) {
-            const sellerId = order.seller;
+            const sellerId = order.seller?._id || order.seller;
             const creditAmount = Number(order.subtotal || 0);
             if (!sellerId || creditAmount <= 0) continue;
 
@@ -879,6 +922,23 @@ class PaymentService {
                 "Payment successful!",
                 `Your payment of **₦${payment.amount.toLocaleString()}** was successful. Your order is now being processed.`,
             );
+
+            // Send buyer payment confirmation email with order & fulfillment details
+            try {
+                const buyerUser = await User.findById(userIdToClear);
+                if (buyerUser && buyerUser.email) {
+                    await emailService.sendBuyerPaymentConfirmationEmail({
+                        user: buyerUser,
+                        orderHolder: holder,
+                        orders,
+                    });
+                }
+            } catch (buyerEmailErr) {
+                console.error(
+                    "[PaymentService] Failed to send buyer payment confirmation email:",
+                    buyerEmailErr,
+                );
+            }
         }
 
         return { payment, orderHolder: holder, orders };

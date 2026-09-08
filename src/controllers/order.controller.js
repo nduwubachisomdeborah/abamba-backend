@@ -13,18 +13,36 @@ class OrderController {
   static createOrder = asyncHandler(async (req, res) => {
     const shippingAddress = req.body.shippingAddress;
     const addressId = req.body.addressId;
+    const isPickup = Boolean(
+      req.body.isPickupStation === true ||
+      req.body.fulfillmentType === 'pickup_station' ||
+      req.body.isPickup === true
+    );
 
     if (!shippingAddress && !addressId) {
-      // Check if user has a registered address in DB
-      const user = await User.findById(req.user.id);
-      const defaultAddr = user?.addresses?.find((a) => a.isDefault) || user?.addresses?.[0];
-      if (!defaultAddr) {
-        return res.status(400).json({
-          success: false,
-          message: "Shipping address is required to place an order.",
-        });
+      if (isPickup) {
+        req.body.shippingAddress = {
+          fullName: req.user?.name || "Customer",
+          addressLine1: req.body.pickupStation?.address || "ANGELINA HOUSE, 31 WETHERAL ROAD OWERRI IMO STATE NIGERIA",
+          addressLine2: "",
+          city: "Owerri",
+          state: "Imo",
+          zipCode: "460281",
+          country: "NG",
+          phoneNumber: req.user?.phoneNumber || req.user?.phone || req.body.pickupStation?.customerPhone || "+2348060039760",
+        };
+      } else {
+        // Check if user has a registered address in DB
+        const user = await User.findById(req.user.id);
+        const defaultAddr = user?.addresses?.find((a) => a.isDefault) || user?.addresses?.[0];
+        if (!defaultAddr) {
+          return res.status(400).json({
+            success: false,
+            message: "Shipping address is required to place an order.",
+          });
+        }
+        req.body.shippingAddress = defaultAddr;
       }
-      req.body.shippingAddress = defaultAddr;
     }
 
     const result = await orderService.createOrder(req.user.id, req.body);

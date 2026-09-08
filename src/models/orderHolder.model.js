@@ -77,6 +77,37 @@ const orderHolderSchema = new mongoose.Schema(
             default: "pending",
             index: true,
         },
+        fulfillmentType: {
+            type: String,
+            enum: ["delivery", "pickup_station"],
+            default: "delivery",
+        },
+        isPickupStation: {
+            type: Boolean,
+            default: false,
+        },
+        pickupStation: {
+            address: {
+                type: String,
+                default: "ANGELINA HOUSE, 31 WETHERAL ROAD OWERRI IMO STATE NIGERIA",
+            },
+            customerPhone: {
+                type: String,
+                default: "+2348060039760",
+            },
+            supportPhone: {
+                type: String,
+                default: "+2349077758206",
+            },
+            timeline: {
+                type: String,
+                default: "5 to 7 working days from payment date",
+            },
+            fee: {
+                type: Number,
+                default: 0,
+            },
+        },
         notes: { type: String },
         metadata: { type: Object, default: {} },
     },
