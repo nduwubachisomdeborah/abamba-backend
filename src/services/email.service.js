@@ -242,44 +242,44 @@ class EmailService {
                 `;
             }).join("");
 
-            let subject = `Payment Confirmed: Order #${orderIdStr} - Abamba Marketplace`;
+            let subject = `Your Abamba Order #${orderIdStr} - Payment Confirmed`;
             let fulfillmentBlock = "";
 
             if (isPickupStation) {
-                subject = `Payment Confirmed: Order #${orderIdStr} - Pick-Up Station Processing`;
+                subject = `Your Abamba Order #${orderIdStr} - Ready for Office Collection in 5-7 Days`;
                 fulfillmentBlock = `
                 <!-- Pick-Up Station Specific Information -->
                 <div style="background-color: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 18px; margin: 20px 0;">
                     <div style="display: flex; align-items: center; margin-bottom: 12px;">
                         <span style="font-size: 20px; margin-right: 8px;">🏢</span>
-                        <h3 style="margin: 0; color: #15803d; font-size: 17px;">Pick-Up Station Order Confirmation</h3>
+                        <h3 style="margin: 0; color: #15803d; font-size: 17px;">Abamba Official Pick-Up Station Receipt</h3>
                     </div>
                     <table style="width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.6;">
                         <tr>
-                            <td style="padding: 4px 0; color: #4b5563; width: 140px;"><strong>Shipping Fee:</strong></td>
-                            <td style="padding: 4px 0; color: #15803d; font-weight: bold;">₦0.00 (Free Pickup)</td>
+                            <td style="padding: 4px 0; color: #4b5563; width: 160px;"><strong>Delivery Method:</strong></td>
+                            <td style="padding: 4px 0; color: #15803d; font-weight: bold;">Abamba Official Pick-Up Station (Zero Fee - ₦0)</td>
                         </tr>
                         <tr>
-                            <td style="padding: 4px 0; color: #4b5563;"><strong>Pick-Up Office Address:</strong></td>
+                            <td style="padding: 4px 0; color: #4b5563;"><strong>Shipping Fee:</strong></td>
+                            <td style="padding: 4px 0; color: #15803d; font-weight: bold;">₦0.00 (FREE)</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 4px 0; color: #4b5563;"><strong>Office Collection Address:</strong></td>
                             <td style="padding: 4px 0; color: #1f2937; font-weight: bold;">ANGELINA HOUSE, 31 WETHERAL ROAD OWERRI IMO STATE NIGERIA</td>
                         </tr>
                         <tr>
-                            <td style="padding: 4px 0; color: #4b5563;"><strong>Customer Care:</strong></td>
-                            <td style="padding: 4px 0;"><a href="tel:+2348060039760" style="color: #003459; font-weight: bold;">+2348060039760</a></td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 4px 0; color: #4b5563;"><strong>Support Line:</strong></td>
-                            <td style="padding: 4px 0;"><a href="tel:+2349077758206" style="color: #003459; font-weight: bold;">+2349077758206</a></td>
+                            <td style="padding: 4px 0; color: #4b5563;"><strong>Contact Numbers:</strong></td>
+                            <td style="padding: 4px 0;">Customers: <a href="tel:+2348060039760" style="color: #003459; font-weight: bold;">+2348060039760</a> | Support: <a href="tel:+2349077758206" style="color: #003459; font-weight: bold;">+2349077758206</a></td>
                         </tr>
                         <tr>
                             <td style="padding: 4px 0; color: #4b5563;"><strong>Collection Timeline:</strong></td>
-                            <td style="padding: 4px 0; color: #1f2937;">5 to 7 working days from payment date</td>
+                            <td style="padding: 4px 0; color: #1f2937; font-weight: 500;">5 to 7 working days</td>
                         </tr>
                     </table>
 
                     <div style="margin-top: 14px; padding: 12px; background-color: #ffffff; border-radius: 6px; border-left: 4px solid #15803d;">
                         <p style="margin: 0; font-size: 13px; color: #166534; font-weight: 500;">
-                            📌 <strong>Important Collection Instructions:</strong> Please remember to bring your <strong>Order ID (#${orderIdStr})</strong> and a valid ID to the Owerri office to collect your package.
+                            📌 <strong>Timeline Note:</strong> Your product will be ready for pickup at our office within 5 to 7 working days. Please bring your <strong>Order ID (#${orderIdStr})</strong> and a valid ID when coming to collect your order.
                         </p>
                     </div>
                 </div>

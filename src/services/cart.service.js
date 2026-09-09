@@ -138,8 +138,39 @@ class CartService {
 
         let shipping = null;
 
-        // 1. If frontend passed a structured shipping object in itemData.shipping
-        if (itemData.shipping && typeof itemData.shipping === "object") {
+        const isPickup =
+            carrierId === "pickup-station" ||
+            itemData.isPickupStation === true ||
+            itemData.fulfillmentType === "pickup_station" ||
+            itemData.courierName?.toLowerCase()?.includes("pick-up") ||
+            itemData.shipping?.carrierId === "pickup-station" ||
+            itemData.shipping?.carrierName?.toLowerCase()?.includes("pick-up");
+
+        if (isPickup) {
+            shipping = {
+                amount: 0,
+                price: 0,
+                total: 0,
+                fee: 0,
+                service_code: "pickup-station",
+                carrierId: "pickup-station",
+                courier_id: "pickup-station",
+                carrierName: "Abamba Official Pick-Up Station",
+                courier_name: "Abamba Official Pick-Up Station",
+                name: "Abamba Official Pick-Up Station",
+                isPickupStation: true,
+                fulfillmentType: "pickup_station",
+                pickupStation: {
+                    officeAddress: "ANGELINA HOUSE, 31 WETHERAL ROAD OWERRI IMO STATE NIGERIA",
+                    address: "ANGELINA HOUSE, 31 WETHERAL ROAD OWERRI IMO STATE NIGERIA",
+                    customerPhone: "+2348060039760",
+                    supportPhone: "+2349077758206",
+                    timeline: "5 to 7 working days",
+                },
+                carrierLogo: null,
+                request_token: request_token || "REQ-PICKUP",
+            };
+        } else if (itemData.shipping && typeof itemData.shipping === "object") {
             const shipObj = itemData.shipping;
             const carrierCode =
                 shipObj.carrierId ||
@@ -713,23 +744,36 @@ class CartService {
         // Calculate accumulated shipping fee across cart items
         let totalShippingFee = 0;
         let activeCourier = null;
+        let hasPickupStationItem = false;
 
         if (enhancedItems.length > 0) {
             enhancedItems.forEach((item) => {
-                const shipAmount =
-                    item.shipping?.amount !== undefined &&
-                    !isNaN(Number(item.shipping?.amount))
+                const isItemPickup = Boolean(
+                    item.shipping?.carrierId === "pickup-station" ||
+                    item.shipping?.courier_id === "pickup-station" ||
+                    item.shipping?.isPickupStation === true ||
+                    item.shipping?.carrierName?.toLowerCase()?.includes("pick-up")
+                );
+                if (isItemPickup) {
+                    hasPickupStationItem = true;
+                }
+
+                const shipAmount = isItemPickup
+                    ? 0
+                    : (item.shipping?.amount !== undefined && !isNaN(Number(item.shipping?.amount))
                         ? Number(item.shipping.amount)
-                        : 3000;
+                        : 3000);
                 totalShippingFee += shipAmount;
                 if (!activeCourier && item.shipping) {
                     activeCourier = item.shipping;
                 }
             });
 
-            // Default to standard regional delivery (3000) if item shipping wasn't specified
-            if (totalShippingFee === 0) {
+            // If not pickup station and fee is 0, default to standard regional delivery (3000)
+            if (!hasPickupStationItem && totalShippingFee === 0) {
                 totalShippingFee = 3000;
+            } else if (hasPickupStationItem) {
+                totalShippingFee = 0;
             }
 
             if (!activeCourier) {
@@ -752,7 +796,7 @@ class CartService {
 
         const estimatedTotal =
             enhancedItems.length > 0
-                ? Number(totalPrice || 0) + Number(totalShippingFee || 3000)
+                ? Number(totalPrice || 0) + Number(totalShippingFee || 0)
                 : 0;
 
         // Update cart totals in memory only

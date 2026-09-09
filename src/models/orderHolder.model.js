@@ -87,6 +87,10 @@ const orderHolderSchema = new mongoose.Schema(
             default: false,
         },
         pickupStation: {
+            officeAddress: {
+                type: String,
+                default: "ANGELINA HOUSE, 31 WETHERAL ROAD OWERRI IMO STATE NIGERIA",
+            },
             address: {
                 type: String,
                 default: "ANGELINA HOUSE, 31 WETHERAL ROAD OWERRI IMO STATE NIGERIA",

@@ -356,17 +356,22 @@ class PaymentService {
         const isPickupStation = Boolean(
             orderData.isPickupStation === true ||
             orderData.fulfillmentType === "pickup_station" ||
-            orderData.isPickup === true
+            orderData.isPickup === true ||
+            orderData.courierId === "pickup-station" ||
+            orderData.carrierId === "pickup-station" ||
+            orderData.courierName?.toLowerCase()?.includes("pick-up") ||
+            orderData.carrier?.toLowerCase()?.includes("pick-up")
         );
         const fulfillmentType = isPickupStation ? "pickup_station" : (orderData.fulfillmentType || "delivery");
 
-        const pickupStationDetails = {
-            address: orderData.pickupStation?.address || "ANGELINA HOUSE, 31 WETHERAL ROAD OWERRI IMO STATE NIGERIA",
+        const pickupStationDetails = isPickupStation ? {
+            officeAddress: orderData.pickupStation?.officeAddress || orderData.pickupStation?.address || "ANGELINA HOUSE, 31 WETHERAL ROAD OWERRI IMO STATE NIGERIA",
+            address: orderData.pickupStation?.address || orderData.pickupStation?.officeAddress || "ANGELINA HOUSE, 31 WETHERAL ROAD OWERRI IMO STATE NIGERIA",
             customerPhone: orderData.pickupStation?.customerPhone || "+2348060039760",
             supportPhone: orderData.pickupStation?.supportPhone || "+2349077758206",
-            timeline: orderData.pickupStation?.timeline || "5 to 7 working days from payment date",
+            timeline: orderData.pickupStation?.timeline || "5 to 7 working days",
             fee: 0,
-        };
+        } : null;
 
         // Compute holder totals
         const holderSubtotal = enrichedItems.reduce(
@@ -387,6 +392,45 @@ class PaymentService {
         const destCity = (finalShippingAddress?.city || "").toLowerCase().trim();
         const isAbiaRoute = destState.includes("abia") || destCity.includes("aba");
 
+        // Courier Directory
+        const COURIER_DIRECTORY = {
+            richmond: {
+                code: "richmond",
+                name: "RichmondLogistics",
+                email: "richmondoc2@gmail.com",
+                state: "Imo",
+                defaultBasePrice: 3000,
+            },
+            apex: {
+                code: "apex",
+                name: "Apexgologisticservices",
+                email: "Apexgologisticservices@gmail.com",
+                state: "Imo",
+                defaultBasePrice: 3000,
+            },
+            hens: {
+                code: "hens",
+                name: "HensLogistics",
+                email: "cchineduikechukwu@gmail.com",
+                state: "Imo",
+                defaultBasePrice: 3000,
+            },
+            princeswift: {
+                code: "princeswift",
+                name: "PrinceswiftLogistics",
+                email: "chisomprince722@gmail.com",
+                state: "Abia",
+                defaultBasePrice: 3000,
+            },
+            oksaturday: {
+                code: "oksaturday",
+                name: "OkSaturdaylogistics",
+                email: "sattyugo2@gmail.com",
+                state: "Abia",
+                defaultBasePrice: 3000,
+            },
+        };
+
         // Check for assigned logistics company
         let assignedCompany = null;
         const requestedCarrier =
@@ -399,7 +443,14 @@ class PaymentService {
             orderData.logisticsCompany;
 
         if (requestedCarrier) {
-            if (mongoose.Types.ObjectId.isValid(requestedCarrier)) {
+            const reqKey = typeof requestedCarrier === "string" ? requestedCarrier.toLowerCase().trim() : "";
+            if (reqKey.includes("richmond")) assignedCompany = { ...COURIER_DIRECTORY.richmond };
+            else if (reqKey.includes("apex")) assignedCompany = { ...COURIER_DIRECTORY.apex };
+            else if (reqKey.includes("hens")) assignedCompany = { ...COURIER_DIRECTORY.hens };
+            else if (reqKey.includes("prince")) assignedCompany = { ...COURIER_DIRECTORY.princeswift };
+            else if (reqKey.includes("saturday") || reqKey.includes("oksaturday")) assignedCompany = { ...COURIER_DIRECTORY.oksaturday };
+
+            if (!assignedCompany && mongoose.Types.ObjectId.isValid(requestedCarrier)) {
                 assignedCompany = await LogisticsCompany.findById(requestedCarrier);
             }
             if (!assignedCompany && typeof requestedCarrier === "string") {
@@ -424,24 +475,7 @@ class PaymentService {
                     assignedCompany.name?.toLowerCase().includes("saturday"));
 
             if (!isAbiaCourier) {
-                // If Imo courier was submitted, auto-correct to PrinceswiftLogistics
-                assignedCompany = await LogisticsCompany.findOne({
-                    $or: [
-                        { code: "princeswift" },
-                        { name: "PrinceswiftLogistics" },
-                        { email: "chisomprince722@gmail.com" },
-                    ],
-                });
-                if (!assignedCompany) {
-                    assignedCompany = {
-                        _id: new mongoose.Types.ObjectId(),
-                        code: "princeswift",
-                        name: "PrinceswiftLogistics",
-                        email: "chisomprince722@gmail.com",
-                        state: "Abia",
-                        defaultBasePrice: 3000,
-                    };
-                }
+                assignedCompany = { ...COURIER_DIRECTORY.princeswift };
             }
         } else {
             // Imo route: courier must be RichmondLogistics, Apexgologisticservices, or HensLogistics
@@ -455,24 +489,7 @@ class PaymentService {
                     assignedCompany.name?.toLowerCase().includes("hens"));
 
             if (!isImoCourier) {
-                // If Abia courier was submitted, auto-correct to RichmondLogistics
-                assignedCompany = await LogisticsCompany.findOne({
-                    $or: [
-                        { code: "richmond" },
-                        { name: "RichmondLogistics" },
-                        { email: "richmondoc2@gmail.com" },
-                    ],
-                });
-                if (!assignedCompany) {
-                    assignedCompany = {
-                        _id: new mongoose.Types.ObjectId(),
-                        code: "richmond",
-                        name: "RichmondLogistics",
-                        email: "richmondoc2@gmail.com",
-                        state: "Imo",
-                        defaultBasePrice: 3000,
-                    };
-                }
+                assignedCompany = { ...COURIER_DIRECTORY.richmond };
             }
         }
 

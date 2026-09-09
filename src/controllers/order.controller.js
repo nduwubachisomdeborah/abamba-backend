@@ -16,7 +16,10 @@ class OrderController {
     const isPickup = Boolean(
       req.body.isPickupStation === true ||
       req.body.fulfillmentType === 'pickup_station' ||
-      req.body.isPickup === true
+      req.body.isPickup === true ||
+      req.body.courierId === 'pickup-station' ||
+      req.body.carrierId === 'pickup-station' ||
+      req.body.courierName?.toLowerCase()?.includes('pick-up')
     );
 
     if (!shippingAddress && !addressId) {
