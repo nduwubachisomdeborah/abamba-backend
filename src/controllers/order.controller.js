@@ -96,7 +96,8 @@ class OrderController {
     const { orders, pagination } = await orderService.getOrders(
       req.query,
       req.user.id,
-      req.user.role
+      req.user.role,
+      req.user
     );
     
     return successResponse(res, 'Orders retrieved successfully', { orders, pagination });
@@ -111,7 +112,8 @@ class OrderController {
     const order = await orderService.getOrderById(
       req.params.id,
       req.user.id,
-      req.user.role
+      req.user.role,
+      req.user
     );
     
     return successResponse(res, 'Order retrieved successfully', order);
@@ -129,7 +131,8 @@ class OrderController {
       req.params.id,
       status,
       req.user.id,
-      req.user.role
+      req.user.role,
+      req.user
     );
     
     return successResponse(res, 'Order status updated successfully', order);

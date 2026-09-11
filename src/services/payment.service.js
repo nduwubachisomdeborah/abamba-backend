@@ -980,6 +980,29 @@ class PaymentService {
                     if (verification?.data?.status === "success") {
                         console.log(`[PaymentService] Auto-reconciled Paystack payment: ${p.reference}`);
                         await this.verifyAndFinalizeByReference(p.reference);
+                    } else if (
+                        verification?.data?.status === "abandoned" &&
+                        p.createdAt < new Date(Date.now() - 30 * 60 * 1000)
+                    ) {
+                        p.status = "abandoned";
+                        p.details = verification.data;
+                        await p.save();
+                        await Order.updateMany(
+                            {
+                                $or: [
+                                    { "payment.reference": p.reference },
+                                    { _id: { $in: p.metadata?.orderId ? [p.metadata.orderId] : [] } },
+                                ],
+                                status: "pending",
+                            },
+                            {
+                                $set: {
+                                    status: "abandoned",
+                                    paymentStatus: "abandoned",
+                                    "payment.status": "abandoned",
+                                },
+                            },
+                        );
                     }
                 } catch (pErr) {
                     // Not paid or still pending on Paystack
@@ -1010,6 +1033,17 @@ class PaymentService {
                         if (verification?.data?.status === "success") {
                             console.log(`[PaymentService] Auto-reconciled pending order #${ord.orderNumber || ord._id} via payment ${ordPayment.reference}`);
                             await this.verifyAndFinalizeByReference(ordPayment.reference);
+                        } else if (
+                            verification?.data?.status === "abandoned" &&
+                            ord.createdAt < new Date(Date.now() - 30 * 60 * 1000)
+                        ) {
+                            ordPayment.status = "abandoned";
+                            ordPayment.details = verification.data;
+                            await ordPayment.save();
+                            ord.status = "abandoned";
+                            ord.paymentStatus = "abandoned";
+                            ord.payment.status = "abandoned";
+                            await ord.save();
                         }
                     } catch (pErr) {
                         // ignore

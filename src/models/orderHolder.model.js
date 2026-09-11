@@ -73,7 +73,7 @@ const orderHolderSchema = new mongoose.Schema(
         currency: { type: String, default: process.env.CURRENCY || "NGN" },
         status: {
             type: String,
-            enum: ["pending", "paid", "failed", "cancelled", "refunded"],
+            enum: ["pending", "paid", "failed", "cancelled", "refunded", "abandoned"],
             default: "pending",
             index: true,
         },

@@ -29,9 +29,10 @@ class OrderService {
      * @param {string} orderId - Order ID or sequential order number
      * @param {string} userId - User ID
      * @param {string} userRole - User role
+     * @param {Object} [user] - User object
      * @returns {Promise<Object>} Order object
      */
-    async getOrderById(orderId, userId, userRole) {
+    async getOrderById(orderId, userId, userRole, user = null) {
         let query;
 
         // Check if orderId is a number (sequential ID) or ObjectId
@@ -66,35 +67,51 @@ class OrderService {
             throw new AppError("Order not found", 404);
         }
 
-        // Check authorization based on user role
-        if (userRole === "admin") {
-            // Admin can see any order
-            return order;
-        } else if (userRole === "seller") {
-            // Check if order belongs directly to seller or contains their products
-            const sellerIdStr = (order.seller?._id || order.seller)?.toString();
-            if (sellerIdStr && sellerIdStr === userId.toString()) {
-                return order;
-            }
+        // Check authorization based on user role and roles array
+        const isAdmin =
+            userRole === "admin" ||
+            user?.role === "admin" ||
+            user?.roles?.includes("admin") ||
+            user?.roles?.includes("superAdmin");
+        const isSeller =
+            userRole === "seller" ||
+            user?.role === "seller" ||
+            user?.roles?.includes("seller") ||
+            Boolean(user?.business);
 
-            const orderProductIds = order.items.map((item) =>
-                (item.product?._id || item.product).toString()
-            );
+        let authorized = false;
 
-            const sellerProducts = await mongoose.model("Product").find({
-                _id: { $in: orderProductIds },
-                user: userId,
-            });
-
-            if (sellerProducts.length === 0) {
-                throw new AppError("Not authorized to view this order", 403);
-            }
+        if (isAdmin) {
+            authorized = true;
         } else {
+            // If the user placed this order as a customer/buyer, they can view it
             const customerIdStr = (order.user?._id || order.user)?.toString();
-            if (customerIdStr !== userId.toString()) {
-                // Regular users can only see their own orders
-                throw new AppError("Not authorized to view this order", 403);
+            if (customerIdStr === userId.toString()) {
+                authorized = true;
+            } else if (isSeller) {
+                // If the user is a seller and owns this order or its items, they can view it
+                const sellerIdStr = (order.seller?._id || order.seller)?.toString();
+                if (sellerIdStr && sellerIdStr === userId.toString()) {
+                    authorized = true;
+                } else {
+                    const orderProductIds = order.items.map((item) =>
+                        (item.product?._id || item.product).toString()
+                    );
+
+                    const sellerProducts = await mongoose.model("Product").find({
+                        _id: { $in: orderProductIds },
+                        user: userId,
+                    });
+
+                    if (sellerProducts.length > 0) {
+                        authorized = true;
+                    }
+                }
             }
+        }
+
+        if (!authorized) {
+            throw new AppError("Not authorized to view this order", 403);
         }
 
         const orderObj = order.toObject ? order.toObject() : { ...order };
@@ -119,9 +136,10 @@ class OrderService {
      * @param {Object} query - Query parameters
      * @param {string} userId - User ID
      * @param {string} userRole - User role
+     * @param {Object} [user] - User object
      * @returns {Promise<Object>} Orders and pagination data
      */
-    async getOrders(query = {}, userId, userRole) {
+    async getOrders(query = {}, userId, userRole, user = null) {
         // Extract pagination parameters
         const { page, limit, skip } =
             PaginationUtil.getPaginationOptions(query);
@@ -129,12 +147,33 @@ class OrderService {
         // Build filter based on user role
         const filter = { deleted: false };
 
-        if (userRole === "admin") {
+        const isAdmin =
+            userRole === "admin" ||
+            user?.role === "admin" ||
+            user?.roles?.includes("admin") ||
+            user?.roles?.includes("superAdmin");
+        const isSeller =
+            userRole === "seller" ||
+            user?.role === "seller" ||
+            user?.roles?.includes("seller") ||
+            Boolean(user?.business);
+
+        const isBuyerScope =
+            query.scope === "buyer" ||
+            query.role === "buyer" ||
+            query.as === "buyer" ||
+            query.type === "buyer" ||
+            query.buyerOnly === "true";
+
+        if (isAdmin) {
             // Admins can see all orders
             if (query.userId) {
                 filter.user = query.userId;
             }
-        } else if (userRole === "seller") {
+            if (query.sellerId) {
+                filter.seller = query.sellerId;
+            }
+        } else if (isSeller && !isBuyerScope) {
             // Find all products by this seller
             const sellerProducts = await mongoose
                 .model("Product")
@@ -148,7 +187,7 @@ class OrderService {
                 ...(sellerProductIds.length > 0 ? [{ "items.product": { $in: sellerProductIds } }] : []),
             ];
         } else {
-            // Regular users can only see their own orders
+            // Regular users / buyers (or sellers viewing their own purchases)
             filter.user = userId;
         }
 
@@ -249,17 +288,24 @@ class OrderService {
      * @param {string} userRole - User role
      * @returns {Promise<Object>} Updated order
      */
-    async updateOrderStatus(orderId, status, userId, userRole) {
-        const order = await this.getOrderById(orderId, userId, userRole);
+    async updateOrderStatus(orderId, status, userId, userRole, user = null) {
+        const order = await this.getOrderById(orderId, userId, userRole, user);
+
+        const isAdmin =
+            userRole === "admin" ||
+            user?.role === "admin" ||
+            user?.roles?.includes("admin") ||
+            user?.roles?.includes("superAdmin");
 
         // Only admin can update order status
-        if (userRole !== "admin") {
+        if (!isAdmin) {
             throw new AppError("Not authorized to update order status", 403);
         }
 
         // Validate status transition
         const validTransitions = {
-            pending: ["paid", "processing", "cancelled"],
+            pending: ["paid", "processing", "cancelled", "abandoned"],
+            abandoned: ["cancelled", "refunded", "paid", "processing"],
             processing: ["paid", "shipped", "delivered", "cancelled"],
             paid: ["processing", "shipped", "delivered", "cancelled"],
             shipped: ["delivered", "returned"],
@@ -268,7 +314,7 @@ class OrderService {
             refunded: [],
         };
 
-        if (!validTransitions[order.status].includes(status)) {
+        if (!validTransitions[order.status]?.includes(status)) {
             throw new AppError(
                 `Cannot change order status from ${order.status} to ${status}`,
                 400
@@ -303,10 +349,10 @@ class OrderService {
             }
         }
 
-        // If order is cancelled or refunded, handle payment status
-        if (status === "cancelled" || status === "refunded") {
+        // If order is cancelled, refunded or abandoned, handle payment status
+        if (status === "cancelled" || status === "refunded" || status === "abandoned") {
             order.payment.status =
-                status === "cancelled" ? "failed" : "refunded";
+                status === "cancelled" ? "failed" : status === "abandoned" ? "abandoned" : "refunded";
         }
 
         await order.save();
