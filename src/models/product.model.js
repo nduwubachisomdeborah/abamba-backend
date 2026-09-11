@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import CategoryOption from "./categoryOptions.model.js";
+import cache from "../utils/cache.util.js";
 
 // Define variant schema for product variations
 const variantSchema = new mongoose.Schema({
@@ -291,13 +292,23 @@ const productSchema = new mongoose.Schema(
     }
 );
 
-// Add index for faster queries
+// Add single & compound indexes for high-traffic queries and sorting
 productSchema.index({ name: 1 });
 productSchema.index({ category: 1 });
 productSchema.index({ "variants.price": 1 });
 productSchema.index({ rating: -1 });
 productSchema.index({ featured: 1 });
 productSchema.index({ brand: 1 });
+productSchema.index({ user: 1, deleted: 1 });
+
+// High-speed compound indexes for active marketplace catalog queries
+productSchema.index({ deleted: 1, approved: 1, disabled: 1, category: 1, createdAt: -1 });
+productSchema.index({ deleted: 1, approved: 1, disabled: 1, featured: 1, createdAt: -1 });
+productSchema.index({ deleted: 1, approved: 1, disabled: 1, onSale: 1, createdAt: -1 });
+productSchema.index({ deleted: 1, approved: 1, disabled: 1, user: 1, createdAt: -1 });
+
+// Full-text search index for fast keyword search across name, description, and brand
+productSchema.index({ name: "text", description: "text", brand: "text" });
 
 // Virtual for formatted base price with currency
 productSchema.virtual("formattedBasePrice").get(function () {
@@ -413,6 +424,18 @@ productSchema.pre("save", function (next) {
 
     next();
 });
+
+// Invalidate product caches whenever a product is created, updated, or removed
+const invalidateProductCaches = () => {
+    cache.del("category_dummy_exclusion_condition");
+    cache.delPattern("^products_");
+};
+
+productSchema.post("save", invalidateProductCaches);
+productSchema.post("findOneAndUpdate", invalidateProductCaches);
+productSchema.post("updateMany", invalidateProductCaches);
+productSchema.post("deleteOne", { document: true, query: true }, invalidateProductCaches);
+productSchema.post("deleteMany", invalidateProductCaches);
 
 const Product = mongoose.model("Product", productSchema);
 

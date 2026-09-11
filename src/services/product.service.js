@@ -8,58 +8,65 @@ import PaginationUtil from "../utils/pagination.util.js";
 import reviewService from "./review.service.js";
 import { processPromoInfo } from "./promo.helper.js";
 import ProductViewed from "../models/productviewed.model.js";
+import cache from "../utils/cache.util.js";
 
 class ProductService {
     /**
      * Helper to exclude dummy products from categories that have active products from real sellers
+     * Cached with 3-minute TTL to prevent high-traffic database lockups
      * @param {Object} baseFilter - Initial query filter
      * @returns {Promise<Object>} Modified filter excluding dummy products where real seller products exist
      */
     async _buildCategoryDummyFilter(baseFilter = {}) {
         try {
-            // Find dummy users / seed sellers
-            const dummyUsers = await User.find({
-                $or: [
-                    { email: { $in: ["seller@example.com", "zek.tech24@gmail.com"] } },
-                    { name: "Default Seller" },
-                ],
-            }).select("_id");
-            const dummyUserIds = dummyUsers.map((u) => u._id);
+            const dummyExclusion = await cache.wrap("category_dummy_exclusion_condition", async () => {
+                // Find dummy users / seed sellers
+                const dummyUsers = await User.find({
+                    $or: [
+                        { email: { $in: ["seller@example.com", "zek.tech24@gmail.com"] } },
+                        { name: "Default Seller" },
+                    ],
+                }).select("_id").lean();
+                const dummyUserIds = dummyUsers.map((u) => u._id);
 
-            // Find categories that have at least one approved, active, real (non-dummy) seller product
-            const realProductQuery = {
-                deleted: false,
-                approved: true,
-                disabled: false,
-                $and: [{ isDummy: { $ne: true } }],
-            };
-            if (dummyUserIds.length > 0) {
-                realProductQuery.$and.push({ user: { $nin: dummyUserIds } });
-            }
-
-            const categoriesWithRealProducts = await Product.distinct(
-                "category",
-                realProductQuery
-            );
-
-            const validRealCategories = categoriesWithRealProducts.filter(Boolean);
-
-            if (validRealCategories.length > 0) {
-                const dummyConditions = [{ isDummy: true }];
+                // Find categories that have at least one approved, active, real (non-dummy) seller product
+                const realProductQuery = {
+                    deleted: false,
+                    approved: true,
+                    disabled: false,
+                    $and: [{ isDummy: { $ne: true } }],
+                };
                 if (dummyUserIds.length > 0) {
-                    dummyConditions.push({ user: { $in: dummyUserIds } });
+                    realProductQuery.$and.push({ user: { $nin: dummyUserIds } });
                 }
 
-                // If a product belongs to a category that has real products, it CANNOT be a dummy product
-                const dummyExclusion = {
-                    $nor: [
-                        {
-                            category: { $in: validRealCategories },
-                            $or: dummyConditions,
-                        },
-                    ],
-                };
+                const categoriesWithRealProducts = await Product.distinct(
+                    "category",
+                    realProductQuery
+                );
 
+                const validRealCategories = categoriesWithRealProducts.filter(Boolean);
+
+                if (validRealCategories.length > 0) {
+                    const dummyConditions = [{ isDummy: true }];
+                    if (dummyUserIds.length > 0) {
+                        dummyConditions.push({ user: { $in: dummyUserIds } });
+                    }
+
+                    return {
+                        $nor: [
+                            {
+                                category: { $in: validRealCategories },
+                                $or: dummyConditions,
+                            },
+                        ],
+                    };
+                }
+
+                return null;
+            }, 180);
+
+            if (dummyExclusion) {
                 return {
                     ...baseFilter,
                     $and: [...(baseFilter.$and || []), dummyExclusion],

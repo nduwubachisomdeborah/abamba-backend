@@ -4,6 +4,7 @@ import { authenticate } from '../../middlewares/auth.js';
 import { adminOnly } from '../../middlewares/auth.js';
 import { sellerOrAdmin } from '../../middlewares/seller.js';
 import { validateCreateOrder, validateUpdateOrderStatus, validateUpdatePayment } from '../../validators/order.validator.js';
+import { checkoutLimiter } from '../../middlewares/rateLimit.js';
 
 const router = express.Router();
 
@@ -11,8 +12,8 @@ const router = express.Router();
 router.use(authenticate);
 
 // Customer order routes
-router.post('/', validateCreateOrder, OrderController.createOrder);
-router.post('/payment/verify', OrderController.verifyPayment);
+router.post('/', checkoutLimiter, validateCreateOrder, OrderController.createOrder);
+router.post('/payment/verify', checkoutLimiter, OrderController.verifyPayment);
 
 // Both customer and seller order routes
 router.get('/', OrderController.getOrders);

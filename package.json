@@ -6,6 +6,8 @@
     "type": "module",
     "scripts": {
         "start": "node src/app.js",
+        "start:cluster": "pm2 start ecosystem.config.cjs --env production",
+        "reload": "pm2 reload ecosystem.config.cjs --env production",
         "dev": "nodemon src/app.js",
         "build": "node --check src/app.js",
         "wh": "whcli forward --token=265210d0-1878-478a-a77e-e50b1510ec66 --target=http://localhost:3000/api/v1/payments/webhook/paystack",

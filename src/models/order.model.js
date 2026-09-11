@@ -349,8 +349,11 @@ orderSchema.pre("save", async function (next) {
 });
 
 // Index for efficient queries
-orderSchema.index({ user: 1 });
-orderSchema.index({ status: 1 });
+orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index({ seller: 1, status: 1, createdAt: -1 });
+orderSchema.index({ orderId: 1 });
+orderSchema.index({ "payment.reference": 1 });
+orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ createdAt: -1 });
 
 const Order = mongoose.model("Order", orderSchema);

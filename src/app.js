@@ -129,14 +129,20 @@ const connectWithRetry = async (retryCount = 0) => {
         syncCouriers();
         // Seed Regional Logistics Companies
         seedLogisticsCompanies();
-        // Auto-reconcile any pending Paystack payments on boot
-        paymentService.reconcilePendingPayments().catch((err) =>
-            console.error("Reconcile on boot error:", err?.message)
-        );
-        // Continuously reconcile pending payments every 45 seconds in background
-        setInterval(() => {
-            paymentService.reconcilePendingPayments().catch(() => {});
-        }, 45 * 1000);
+
+        // Auto-reconcile pending payments (guarded to run only on primary cluster worker)
+        const isPrimaryInstance =
+            !process.env.NODE_APP_INSTANCE ||
+            process.env.NODE_APP_INSTANCE === "0";
+
+        if (isPrimaryInstance) {
+            paymentService.reconcilePendingPayments().catch((err) =>
+                console.error("Reconcile on boot error:", err?.message)
+            );
+            setInterval(() => {
+                paymentService.reconcilePendingPayments().catch(() => {});
+            }, 45 * 1000);
+        }
     } catch (err) {
         console.error(`Could not connect to MongoDB (attempt ${retryCount + 1}):`, err.message);
         if (retryCount < 5) {
@@ -195,8 +201,26 @@ app.use(errorHandler);
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+// Graceful shutdown handling
+const gracefulShutdown = async (signal) => {
+    console.log(`Received ${signal}. Gracefully closing server...`);
+    server.close(async () => {
+        try {
+            await mongoose.connection.close(false);
+            console.log("MongoDB connection closed cleanly.");
+            process.exit(0);
+        } catch (err) {
+            console.error("Error during database disconnection:", err);
+            process.exit(1);
+        }
+    });
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 export default app;
