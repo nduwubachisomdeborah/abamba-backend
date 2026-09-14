@@ -365,16 +365,19 @@ class SellerController {
 
     // Payout management methods
     static requestPayout = asyncHandler(async (req, res) => {
+        const sellerId = req.user._id || req.user.id;
         const transaction = await transactionService.createPayout(
-            req.user.id,
+            sellerId,
             req.body,
         );
 
-        return successResponse(
-            res,
-            "Payout request submitted successfully",
-            transaction,
-        );
+        return res.status(201).json({
+            status: 201,
+            success: true,
+            message: "Payout request submitted successfully. Awaiting admin approval.",
+            data: transaction,
+            payout: transaction,
+        });
     });
 
     static getAllPayouts = asyncHandler(async (req, res) => {

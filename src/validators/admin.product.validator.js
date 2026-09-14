@@ -49,14 +49,10 @@ export const validateDisableReason = (req, res, next) => {
 };
 
 export const payoutRejectionSchema = Joi.object({
-    reason: Joi.string().required().trim().min(3).max(500).messages({
-        "string.base": "Reason must be a string",
-        "string.empty": "Reason is required",
-        "string.min": "Reason must be at least 3 characters long",
-        "string.max": "Reason cannot exceed 500 characters",
-        "any.required": "Please provide a reason for rejecting the payout",
-    }),
-});
+    reason: Joi.string().trim().max(500).optional().allow(""),
+    message: Joi.string().trim().max(500).optional().allow(""),
+    failureReason: Joi.string().trim().max(500).optional().allow(""),
+}).unknown(true);
 
 export const validatePayoutRejection = (req, res, next) => {
     const { error, value } = payoutRejectionSchema.validate(req.body);

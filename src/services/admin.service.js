@@ -371,10 +371,10 @@ class AdminService {
         // Auto-reconcile any pending Paystack payments before listing orders
         await paymentService.reconcilePendingPayments().catch(() => {});
 
-        const { page = 1, limit = 10, search = "", status } = options;
+        const { page = 1, limit = 10, search = "", status, startDate, endDate } = options;
 
-        const pageNumber = parseInt(page);
-        const limitNumber = parseInt(limit);
+        const pageNumber = parseInt(page) || 1;
+        const limitNumber = parseInt(limit) || 10;
         const skip = (pageNumber - 1) * limitNumber;
 
         const query = { deleted: { $ne: true } };
@@ -392,8 +392,24 @@ class AdminService {
             ];
         }
 
-        if (status) {
-            query.status = status;
+        // Only filter by status if a specific status other than 'all' is passed
+        if (status && status !== "all") {
+            if (status === "completed" || status === "delivered") {
+                query.status = { $in: ["completed", "delivered"] };
+            } else {
+                query.status = status;
+            }
+        }
+
+        if (startDate && endDate) {
+            query.createdAt = {
+                $gte: new Date(startDate),
+                $lte: new Date(endDate),
+            };
+        } else if (startDate) {
+            query.createdAt = { $gte: new Date(startDate) };
+        } else if (endDate) {
+            query.createdAt = { $lte: new Date(endDate) };
         }
 
         const aggregation = [

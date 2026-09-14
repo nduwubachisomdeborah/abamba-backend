@@ -244,7 +244,7 @@ router.get(
     "/payouts",
     authenticate,
     adminOnly,
-    AdminController.getPendingPayouts,
+    AdminController.getAllPayouts,
 );
 router.patch(
     "/payouts/:id/approve",

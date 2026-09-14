@@ -137,7 +137,7 @@ router.get("/following", authenticate, SellerController.getFollowing);
 
 // Payout routes
 router.post(
-    "/payout",
+    ["/payout", "/payouts"],
     authenticate,
     restrictTo("seller"),
     validate(payoutRequestSchema),

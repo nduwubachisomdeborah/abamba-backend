@@ -114,16 +114,28 @@ class AdminController {
     });
 
     static getAllOrders = asyncHandler(async (req, res) => {
-        const { page = 1, limit = 10, search = "", status } = req.query;
+        const { page = 1, limit = 10, search = "", status, startDate, endDate } = req.query;
 
         const data = await adminService.getAllOrders({
             page,
             limit,
             search,
             status,
+            startDate,
+            endDate,
         });
 
-        return successResponse(res, "Orders retrieved successfully", data);
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            message: "Orders retrieved successfully",
+            orders: data.orders,
+            totalOrders: data.totalOrders,
+            total: data.totalOrders,
+            totalPages: data.totalPages,
+            currentPage: data.currentPage,
+            data,
+        });
     });
 
     static syncPendingPayments = asyncHandler(async (req, res) => {
@@ -319,20 +331,69 @@ class AdminController {
     });
 
     // Payout management methods
-    static getPendingPayouts = asyncHandler(async (req, res) => {
-        const pendingPayouts = await transactionService.getUserTransactions(
-            null,
-            { type: "payout", status: "pending" },
-        );
-        return successResponse(
-            res,
-            "Pending payouts retrieved successfully",
-            pendingPayouts,
-        );
+    static getAllPayouts = asyncHandler(async (req, res) => {
+        const { status, page = 1, limit = 10, search = "", startDate, endDate } = req.query;
+
+        const filter = { type: "payout" };
+        if (status && status !== "all") {
+            // If frontend passes 'completed', match completed, approved, or success
+            if (status === "completed" || status === "approved" || status === "success") {
+                filter.status = { $in: ["completed", "approved", "success"] };
+            } else if (status === "rejected" || status === "failed" || status === "cancelled") {
+                filter.status = { $in: ["rejected", "failed", "cancelled"] };
+            } else {
+                filter.status = status;
+            }
+        }
+        // If status is not provided or is 'all', do NOT filter out completed payouts!
+
+        if (startDate && endDate) {
+            filter.createdAt = {
+                $gte: new Date(startDate),
+                $lte: new Date(endDate),
+            };
+        } else if (startDate) {
+            filter.createdAt = { $gte: new Date(startDate) };
+        } else if (endDate) {
+            filter.createdAt = { $lte: new Date(endDate) };
+        }
+
+        const pageNum = parseInt(page) || 1;
+        const limitNum = parseInt(limit) || 10;
+        const skip = (pageNum - 1) * limitNum;
+
+        const [payoutsRaw, total] = await Promise.all([
+            Transaction.find(filter)
+                .populate("user", "name email phoneNumber business bank profilePicture")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limitNum)
+                .lean(),
+            Transaction.countDocuments(filter),
+        ]);
+
+        // Attach seller property mirroring user so both payout.seller and payout.user are populated
+        const payouts = payoutsRaw.map((payout) => ({
+            ...payout,
+            seller: payout.seller || payout.user,
+        }));
+
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            message: "Payouts retrieved successfully",
+            data: payouts,
+            payouts,
+            total,
+            totalPages: Math.ceil(total / limitNum),
+            currentPage: pageNum,
+        });
     });
 
+    static getPendingPayouts = AdminController.getAllPayouts;
+
     static approvePayout = asyncHandler(async (req, res) => {
-        const { id } = req.params;
+        const id = req.params.id || req.params.payoutId;
         const updatedTransaction = await transactionService.processPayout(
             id,
             "completed",
@@ -341,74 +402,91 @@ class AdminController {
         const isManual = updatedTransaction.metadata?.payoutMethod === "manual_transfer";
         const message = isManual
             ? "Payout approved successfully. (Paystack automated transfers are inactive on your Paystack account. Please disburse funds directly or contact Paystack support to activate transfers)."
-            : "Payout approved and Paystack transfer initiated successfully";
+            : "Payout approved and transfer initiated successfully!";
 
-        return successResponse(
-            res,
+        return res.status(200).json({
+            status: 200,
+            success: true,
             message,
-            updatedTransaction,
-        );
+            data: updatedTransaction,
+            payout: updatedTransaction,
+        });
     });
 
     static rejectPayout = asyncHandler(async (req, res) => {
-        const { id } = req.params;
-        const { reason } = req.body;
+        const id = req.params.id || req.params.payoutId;
+        const { reason, message, failureReason } = req.body || {};
+        const rejectionNote = reason || message || failureReason || "Rejected by admin";
         const updatedTransaction = await transactionService.processPayout(
             id,
             "failed",
-            { failureReason: reason },
+            { failureReason: rejectionNote },
         );
-        return successResponse(
-            res,
-            "Payout rejected successfully",
-            updatedTransaction,
-        );
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            message: "Payout rejected. Funds returned to seller's available wallet balance.",
+            data: updatedTransaction,
+            payout: updatedTransaction,
+        });
     });
 
     static getPayoutStats = asyncHandler(async (req, res) => {
-        const stats = await Transaction.aggregate([
-            {
-                $match: { type: "payout" },
-            },
-            {
-                $group: {
-                    _id: null,
-                    totalPayoutAmount: { $sum: "$amount" },
-                    totalPayoutCount: { $sum: 1 },
-                    totalPendingPayouts: {
-                        $sum: {
-                            $cond: {
-                                if: { $eq: ["$status", "pending"] },
-                                then: "$amount",
-                                else: 0,
-                            },
-                        },
-                    },
-                    pendingPayoutCount: {
-                        $sum: {
-                            $cond: {
-                                if: { $eq: ["$status", "pending"] },
-                                then: 1,
-                                else: 0,
-                            },
-                        },
+        const [completedStats, pendingStats, totalCount] = await Promise.all([
+            Transaction.aggregate([
+                {
+                    $match: {
+                        type: "payout",
+                        status: { $in: ["completed", "approved", "success"] },
                     },
                 },
-            },
+                {
+                    $group: {
+                        _id: null,
+                        totalAmount: { $sum: "$amount" },
+                        count: { $sum: 1 },
+                    },
+                },
+            ]),
+            Transaction.aggregate([
+                {
+                    $match: {
+                        type: "payout",
+                        status: "pending",
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalAmount: { $sum: "$amount" },
+                        count: { $sum: 1 },
+                    },
+                },
+            ]),
+            Transaction.countDocuments({ type: "payout" }),
         ]);
 
-        const payoutStats = stats[0] || {
-            totalPayoutAmount: 0,
-            totalPayoutCount: 0,
-            totalPendingPayouts: 0,
-            pendingPayoutCount: 0,
+        const totalPayoutAmount = completedStats[0]?.totalAmount || 0;
+        const totalCompletedPayoutCount = completedStats[0]?.count || 0;
+        const totalPendingPayouts = pendingStats[0]?.totalAmount || 0;
+        const pendingPayoutCount = pendingStats[0]?.count || 0;
+
+        const data = {
+            totalPayoutAmount,
+            totalPayoutCount: totalCount,
+            completedPayoutCount: totalCompletedPayoutCount,
+            pendingPayoutCount,
+            totalPendingPayouts,
+            pendingPayoutAmount: totalPendingPayouts,
         };
 
-        return successResponse(
-            res,
-            "Payout statistics retrieved successfully",
-            payoutStats,
-        );
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            message: "Payout statistics retrieved successfully",
+            data,
+            ...data,
+        });
     });
 
     static getCouriers = asyncHandler(async (req, res) => {

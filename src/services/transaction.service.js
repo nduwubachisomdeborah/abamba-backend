@@ -12,7 +12,7 @@ class TransactionService {
      * @returns {Promise<Object>} Transaction object
      */
     async createPayout(userId, payoutData) {
-        const { amount, description } = payoutData;
+        const { amount, description, bankDetails, accountDetails } = payoutData;
 
         // Validate user exists and is a seller
         const user = await User.findById(userId);
@@ -25,33 +25,36 @@ class TransactionService {
             throw new AppError("Only sellers can request payouts", 403);
         }
 
+        const bankInfo = bankDetails || accountDetails || user.bank;
+
         // Check if user has bank details
-        if (!user.bank) {
+        if (!bankInfo || !bankInfo.accountNumber) {
             throw new AppError(
                 "Bank account not found. Please add your bank details before requesting a payout",
                 400,
             );
         }
 
+        const currentBalance = Number(user.wallet?.balance ?? user.walletBalance ?? 0);
         // Check if user has sufficient balance
-        if (user.wallet.balance < amount) {
-            throw new AppError("Insufficient wallet balance", 400);
+        if (currentBalance < amount) {
+            throw new AppError("Insufficient available wallet balance.", 400);
         }
 
         // Generate unique reference
-        const reference = `PYT-${uuidv4().substring(0, 8).toUpperCase()}`;
+        const reference = `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-        // Create transaction with bank details from user profile
+        // Create transaction with bank details from user profile or request body
         const transaction = new Transaction({
             user: userId,
             type: "payout",
             amount,
             method: "bank_transfer",
             accountDetails: {
-                bankName: user.bank.bankName,
-                accountNumber: user.bank.accountNumber.toString(),
-                accountName: user.bank.accountName,
-                bankCode: user.bank.bankCode,
+                bankName: bankInfo.bankName,
+                accountNumber: bankInfo.accountNumber?.toString(),
+                accountName: bankInfo.accountName,
+                bankCode: bankInfo.bankCode,
             },
             description: description || "Payout request",
             reference,
@@ -61,12 +64,14 @@ class TransactionService {
         await transaction.save();
 
         // Update user's wallet - move amount from balance to pendingBalance
-        await User.findByIdAndUpdate(userId, {
-            $inc: {
-                "wallet.balance": -amount,
-                "wallet.pendingBalance": amount,
-            },
-        });
+        if (!user.wallet) {
+            user.wallet = { balance: 0, pendingBalance: 0, holdBalance: 0 };
+        }
+        user.wallet.balance = (Number(user.wallet.balance) || 0) - amount;
+        user.wallet.pendingBalance = (Number(user.wallet.pendingBalance) || 0) + amount;
+        user.walletBalance = user.wallet.balance;
+        user.pendingPayoutBalance = user.wallet.pendingBalance;
+        await user.save();
 
         return transaction;
     }
@@ -134,14 +139,14 @@ class TransactionService {
         }
 
         if (transaction.status !== "pending") {
-            throw new AppError(`Transaction is already ${transaction.status}`, 400);
+            throw new AppError(`Payout is already ${transaction.status}.`, 400);
         }
 
-        if (!["completed", "failed"].includes(status)) {
+        if (!["completed", "failed", "rejected"].includes(status)) {
             throw new AppError("Invalid status", 400);
         }
 
-        if (status === "completed") {
+        if (status === "completed" || status === "approved") {
             const user = await User.findById(transaction.user);
 
             if (!user) {
@@ -278,16 +283,23 @@ class TransactionService {
 
             // Remove from pending balance safely
             const sellerUser = await User.findById(transaction.user);
-            if (sellerUser && sellerUser.wallet) {
-                sellerUser.wallet.pendingBalance = Math.max(
+            if (sellerUser) {
+                if (sellerUser.wallet) {
+                    sellerUser.wallet.pendingBalance = Math.max(
+                        0,
+                        (Number(sellerUser.wallet.pendingBalance) || 0) - transaction.amount,
+                    );
+                }
+                sellerUser.pendingPayoutBalance = Math.max(
                     0,
-                    (Number(sellerUser.wallet.pendingBalance) || 0) - transaction.amount,
+                    (Number(sellerUser.pendingPayoutBalance || sellerUser.wallet?.pendingBalance) || 0) - transaction.amount,
                 );
                 await sellerUser.save();
             }
-        } else if (status === "failed") {
+        } else if (status === "failed" || status === "rejected") {
             transaction.status = "failed";
-            transaction.failureReason = additionalData.failureReason || "Rejected by admin";
+            transaction.failureReason = additionalData.failureReason || additionalData.reason || "Rejected by admin";
+            transaction.rejectionReason = transaction.failureReason;
             transaction.processedAt = new Date();
 
             // Return amount back to balance and remove from pending
@@ -302,6 +314,8 @@ class TransactionService {
                     0,
                     (Number(sellerUser.wallet.pendingBalance) || 0) - transaction.amount,
                 );
+                sellerUser.walletBalance = sellerUser.wallet.balance;
+                sellerUser.pendingPayoutBalance = sellerUser.wallet.pendingBalance;
                 await sellerUser.save();
             }
         }
