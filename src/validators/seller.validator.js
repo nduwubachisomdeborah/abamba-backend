@@ -1,33 +1,51 @@
 import Joi from "joi";
 import { ObjectIdSchema } from "./index.js";
 
+const documentFieldSchema = Joi.alternatives()
+    .try(
+        ObjectIdSchema,
+        Joi.string(),
+        Joi.object().unknown(true),
+        Joi.array()
+    )
+    .allow(null, "")
+    .optional();
+
 const addressSchema = Joi.object({
     addressLine1: Joi.string().required(),
     city: Joi.string().required(),
     state: Joi.string().required(),
     country: Joi.string().optional().default("NG"),
-});
+    addressLine2: Joi.string().allow("", null).optional(),
+    zipCode: Joi.string().allow("", null).optional(),
+    postalCode: Joi.string().allow("", null).optional(),
+}).unknown(true);
 
 const bankSchema = Joi.object({
     bankName: Joi.string().required(),
-    accountNumber: Joi.number().required(),
+    accountNumber: Joi.alternatives().try(Joi.string(), Joi.number()).required(),
     accountName: Joi.string().required(),
-    bankCode: Joi.string().required(),
-    // bvn: Joi.string().required(),
-});
+    bankCode: Joi.alternatives().try(Joi.string(), Joi.number()).required(),
+    bvn: Joi.string().allow("", null).optional(),
+}).unknown(true);
 
 export const sellerUpdateBankSchema = Joi.object({
     bank: bankSchema.required(),
     otp: Joi.string().required().length(6),
-});
+}).unknown(true);
 
 export const sellerOnBoardingSchema = Joi.object({
     // User details
     name: Joi.string().required(),
     phoneNumber: Joi.string().required(),
-    dob: Joi.string()
-        .pattern(/^(0[1-9]|1[0-9]|2[0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{4}$/)
-        .message("Invalid date format eg 01/01/2000")
+    dob: Joi.alternatives()
+        .try(
+            Joi.string().pattern(
+                /^(0[1-9]|1[0-9]|2[0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{4}$/
+            ),
+            Joi.string(),
+            Joi.date()
+        )
         .required(),
     // Address details
     address: addressSchema.required(),
@@ -41,11 +59,15 @@ export const sellerOnBoardingSchema = Joi.object({
     businessAddress: addressSchema.required(),
     businessPhone: Joi.string().required(),
     businessEmail: Joi.string().email().required(),
-    documentType: Joi.string().optional(),
-    personalDocument: ObjectIdSchema.optional(),
-    businessDocument: ObjectIdSchema.optional(),
-    storeLocation: ObjectIdSchema.required(),
-});
+    documentType: Joi.string().allow("", null).optional(),
+    document: documentFieldSchema,
+    personalDocument: documentFieldSchema,
+    businessDocument: documentFieldSchema,
+    storeLocation: Joi.alternatives()
+        .try(ObjectIdSchema, Joi.string(), Joi.object().unknown(true))
+        .allow("", null)
+        .optional(),
+}).unknown(true);
 
 export const sellerSignUpSchema = Joi.object({
     name: Joi.string().required(),

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { AppError } from "../middlewares/error.js";
 import User from "../models/user.model.js";
 import Settings from "../models/settings.model.js";
@@ -493,18 +494,46 @@ class SellerService {
             throw new AppError("Business already approved", 400);
         }
 
-        if (data.personalDocument) {
-            const personalDocument = await fileService.hasFile(data.personalDocument);
-            if (!personalDocument) {
-                throw new AppError("Personal document not found", 404);
+        const extractId = (val) => {
+            if (!val) return null;
+            if (Array.isArray(val)) {
+                val = val[0];
             }
+            if (!val) return null;
+            if (typeof val === "object") {
+                return val._id || val.id || null;
+            }
+            if (typeof val === "string" && val.trim() !== "") {
+                return val.trim();
+            }
+            return null;
+        };
+
+        let personalDocId = extractId(data.personalDocument || data.document);
+        let businessDocId = extractId(data.businessDocument);
+        let storeLocationId = extractId(data.storeLocation);
+
+        if (personalDocId && mongoose.Types.ObjectId.isValid(personalDocId)) {
+            const personalDocument = await fileService.hasFile(personalDocId);
+            if (!personalDocument) {
+                // If not found in file table, keep null or id
+                personalDocId = null;
+            }
+        } else if (personalDocId && !mongoose.Types.ObjectId.isValid(personalDocId)) {
+            personalDocId = null;
         }
 
-        if (data.businessDocument) {
-            const businessDocument = await fileService.hasFile(data.businessDocument);
+        if (businessDocId && mongoose.Types.ObjectId.isValid(businessDocId)) {
+            const businessDocument = await fileService.hasFile(businessDocId);
             if (!businessDocument) {
-                throw new AppError("Business document not found", 404);
+                businessDocId = null;
             }
+        } else if (businessDocId && !mongoose.Types.ObjectId.isValid(businessDocId)) {
+            businessDocId = null;
+        }
+
+        if (storeLocationId && !mongoose.Types.ObjectId.isValid(storeLocationId)) {
+            storeLocationId = null;
         }
 
         const user = {
@@ -521,11 +550,11 @@ class SellerService {
                 },
             ],
             bank: {
-                bankName: data.bank.bankName,
-                accountNumber: data.bank.accountNumber,
-                accountName: data.bank.accountName,
-                bankCode: data.bank.bankCode,
-                bvn: data.bank.bvn,
+                bankName: data.bank?.bankName,
+                accountNumber: data.bank?.accountNumber?.toString(),
+                accountName: data.bank?.accountName,
+                bankCode: data.bank?.bankCode?.toString(),
+                bvn: data.bank?.bvn,
             },
             business: {
                 message: "",
@@ -539,9 +568,9 @@ class SellerService {
                 businessPhone: data.businessPhone,
                 businessEmail: data.businessEmail,
                 documentType: data.documentType,
-                personalDocument: data.personalDocument,
-                businessDocument: data.businessDocument,
-                storeLocation: data.storeLocation,
+                personalDocument: personalDocId,
+                businessDocument: businessDocId,
+                storeLocation: storeLocationId,
             },
         };
         return await User.updateOne({ _id: userId }, { $set: user });
