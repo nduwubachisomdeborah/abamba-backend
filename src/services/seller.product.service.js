@@ -53,9 +53,27 @@ class SellerProductService {
             }
         }
 
-        // Add search by name filter if provided
-        if (query.search) {
-            filter.name = { $regex: query.search, $options: "i" };
+        // Add dynamic keyword / search filter across name, brand, description, tags, category, and sku
+        const searchTerm = (query.search || query.keyword || query.q || "").trim();
+        if (searchTerm) {
+            const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const searchRegex = new RegExp(escaped, "i");
+            const searchConditions = [
+                { name: searchRegex },
+                { brand: searchRegex },
+                { description: searchRegex },
+                { tags: searchRegex },
+                { category: searchRegex },
+                { sku: searchRegex },
+                { "variants.sku": searchRegex },
+            ];
+
+            if (filter.$or) {
+                filter.$and = filter.$and || [];
+                filter.$and.push({ $or: searchConditions });
+            } else {
+                filter.$or = searchConditions;
+            }
         }
 
         // Add featured filter if provided
