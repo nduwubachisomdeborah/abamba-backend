@@ -240,16 +240,30 @@ class ProductService {
             filter.category = { $regex: new RegExp(`^${escapedCategory}$`, "i") };
         }
 
-        // Add brand filter if provided (supports comma-separated values)
+        // Add brand filter if provided (matches brand attribute, product name, or tags)
         if (query.brand) {
-            // Check if brand contains multiple values separated by commas
-            if (query.brand.includes(",")) {
-                const brands = query.brand.split(",").map((b) => b.trim());
-                filter.brand = {
-                    $in: brands.map((brand) => new RegExp(brand, "i")),
-                };
-            } else {
-                filter.brand = { $regex: query.brand, $options: "i" };
+            const brands = String(query.brand)
+                .split(",")
+                .map((b) => b.trim())
+                .filter(Boolean);
+
+            if (brands.length > 0) {
+                const brandConditions = brands.flatMap((brandStr) => {
+                    const escaped = brandStr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                    const brandRegex = new RegExp(escaped, "i");
+                    return [
+                        { brand: brandRegex },
+                        { name: brandRegex },
+                        { tags: brandRegex },
+                    ];
+                });
+
+                if (filter.$or) {
+                    filter.$and = filter.$and || [];
+                    filter.$and.push({ $or: brandConditions });
+                } else {
+                    filter.$or = brandConditions;
+                }
             }
         }
 
@@ -1219,7 +1233,9 @@ class ProductService {
 
             // Apply category filter to brand query if provided
             if (filters.category) {
-                brandQuery.category = filters.category;
+                const cleanCat = String(filters.category).replace(/_/g, " ").trim();
+                const escaped = cleanCat.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                brandQuery.category = { $regex: new RegExp(`^${escaped}$`, "i") };
             }
 
             // Apply search filter if provided
@@ -1227,11 +1243,12 @@ class ProductService {
                 const searchRegex = new RegExp(filters.search, "i");
                 brandQuery.$or = [
                     { name: { $regex: searchRegex } },
+                    { brand: { $regex: searchRegex } },
                     { description: { $regex: searchRegex } },
                 ];
                 categoryQuery.$or = [
+                    { category: { $regex: searchRegex } },
                     { name: { $regex: searchRegex } },
-                    { description: { $regex: searchRegex } },
                 ];
             }
 

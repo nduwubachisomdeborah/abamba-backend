@@ -26,6 +26,33 @@ class SellerProductService {
             filter.category = { $regex: new RegExp(`^${escapedCategory}$`, "i") };
         }
 
+        // Add brand filter if provided (matches brand attribute, product name, or tags)
+        if (query.brand) {
+            const brands = String(query.brand)
+                .split(",")
+                .map((b) => b.trim())
+                .filter(Boolean);
+
+            if (brands.length > 0) {
+                const brandConditions = brands.flatMap((brandStr) => {
+                    const escaped = brandStr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                    const brandRegex = new RegExp(escaped, "i");
+                    return [
+                        { brand: brandRegex },
+                        { name: brandRegex },
+                        { tags: brandRegex },
+                    ];
+                });
+
+                if (filter.$or) {
+                    filter.$and = filter.$and || [];
+                    filter.$and.push({ $or: brandConditions });
+                } else {
+                    filter.$or = brandConditions;
+                }
+            }
+        }
+
         // Add search by name filter if provided
         if (query.search) {
             filter.name = { $regex: query.search, $options: "i" };

@@ -28,7 +28,10 @@ router.post(
 );
 
 // Public routes (some with optional authentication for enhanced features)
-router.get("/brands-categories", ProductController.getBrandsAndCategories);
+router.get(
+    ["/brands-categories", "/brands-and-categories"],
+    ProductController.getBrandsAndCategories
+);
 router.get(
     "/category-options",
     CategoryOptionsController.getAllCategoryOptions
