@@ -23,6 +23,10 @@ class ProductController {
             sellerId: req.query.sellerId, // Add seller ID filtering
         };
 
+        if (req.query.category) {
+            enhancedQuery.category = String(req.query.category).replace(/_/g, " ").trim();
+        }
+
         const { products, pagination } = await productService.getProducts(
             enhancedQuery
         );

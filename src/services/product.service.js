@@ -233,9 +233,11 @@ class ProductService {
             }
         }
 
-        // Add category filter if provided
+        // Add category filter if provided (flexible with spaces/underscores and case-insensitive)
         if (query.category) {
-            filter.category = query.category;
+            const cleanCategory = String(query.category).replace(/_/g, " ").trim();
+            const escapedCategory = cleanCategory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            filter.category = { $regex: new RegExp(`^${escapedCategory}$`, "i") };
         }
 
         // Add brand filter if provided (supports comma-separated values)

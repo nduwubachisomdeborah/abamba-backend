@@ -19,9 +19,11 @@ class SellerProductService {
         // Build filter object - always filter by seller and exclude deleted products
         const filter = { user: sellerId, deleted: false };
 
-        // Add category filter if provided
+        // Add category filter if provided (flexible with spaces/underscores and case-insensitive)
         if (query.category) {
-            filter.category = query.category;
+            const cleanCategory = String(query.category).replace(/_/g, " ").trim();
+            const escapedCategory = cleanCategory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            filter.category = { $regex: new RegExp(`^${escapedCategory}$`, "i") };
         }
 
         // Add search by name filter if provided
