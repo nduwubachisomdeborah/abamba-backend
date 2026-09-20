@@ -10,6 +10,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import rateLimit from "express-rate-limit";
+import compression from "compression";
 
 // Import versioned routes
 import v1Routes from "./routes/v1/index.js";
@@ -62,6 +63,19 @@ app.use(
     })
 );
 
+// GZIP / Brotli API response compression (drops JSON payload transfer size by 70-90%)
+app.use(
+    compression({
+        threshold: 1024,
+        filter: (req, res) => {
+            if (req.headers["x-no-compression"]) {
+                return false;
+            }
+            return compression.filter(req, res);
+        },
+    })
+);
+
 // Generous Rate Limiter (600 requests per 15 minutes to block malicious bots while allowing fast shopping)
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -90,6 +104,16 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // Setup cloud-native request logging (stdout / dev)
 const morganFormat = process.env.NODE_ENV === "production" ? "combined" : "dev";
 app.use(morgan(morganFormat));
+
+// MinIO / Cloudflare Edge Caching Headers for uploads, KYC docs & static assets
+app.use(["/uploads", "/api/v1/upload", "/api/v1/uploads"], (req, res, next) => {
+    if (req.path.includes("/kyc") || req.path.includes("kyc")) {
+        res.setHeader("Cache-Control", "private, max-age=86400, immutable");
+    } else {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    }
+    next();
+});
 
 // Connect to database with resilient options and auto-retry
 const mongooseOptions = {

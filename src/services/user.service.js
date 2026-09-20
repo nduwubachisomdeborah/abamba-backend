@@ -23,12 +23,38 @@ class UserService {
                 populate: [
                     { path: "personalDocument", model: "File" },
                     { path: "businessDocument", model: "File" },
+                    { path: "storeLocation", model: "StoreLocation" },
                 ],
             });
         if (!user) {
             throw new AppError("User not found", 404);
         }
-        return user;
+
+        const userObj = user.toObject ? user.toObject() : { ...user };
+        delete userObj.password;
+        if (userObj.otp) delete userObj.otp.code;
+
+        // Ensure fields exist gracefully
+        userObj.phoneNumber = userObj.phoneNumber || null;
+        userObj.dob = userObj.dob || null;
+        userObj.addresses = userObj.addresses || [];
+        userObj.sellerId = userObj._id;
+        userObj.isSeller =
+            (userObj.roles && userObj.roles.includes("seller")) ||
+            userObj.role === "seller" ||
+            Boolean(userObj.business?.approved || userObj.business?.businessName);
+
+        // Onboarding status flag
+        if (!userObj.business || !userObj.business.businessName) {
+            userObj.business = null;
+            userObj.onboardingStatus = "uncompleted";
+        } else if (userObj.business.approved) {
+            userObj.onboardingStatus = "approved";
+        } else {
+            userObj.onboardingStatus = "pending";
+        }
+
+        return userObj;
     }
 
     /**

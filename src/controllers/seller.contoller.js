@@ -111,9 +111,9 @@ class SellerController {
      * @access  Private/Seller
      */
     static onBoarding = asyncHandler(async (req, res) => {
-        await sellerService.onBoarding(req.user._id, req.body);
+        const result = await sellerService.onBoarding(req.user._id, req.body);
 
-        return successResponse(res, "Seller onboarding successful.");
+        return successResponse(res, "Seller onboarding successful.", result);
     });
 
     /**

@@ -14,9 +14,11 @@ const variantSchema = Joi.object({
         "number.min": "Weight must be a positive number",
         "any.required": "Weight is required",
     }),
-    quantity: Joi.number().required().min(0).messages({
+    quantity: Joi.number().required().min(0).max(50).integer().messages({
         "number.base": "Quantity must be a number",
         "number.min": "Quantity cannot be negative",
+        "number.max": "Maximum available variant quantity is 50",
+        "number.integer": "Quantity must be an integer",
         "any.required": "Quantity is required",
     }),
     price: Joi.number().required().min(0).messages({
@@ -38,11 +40,6 @@ const variantSchema = Joi.object({
             "number.min": "Variant bonus price must be greater than 0",
             "number.less": "Variant bonus price must be lower than the variant price",
         }),
-    quantity: Joi.number().required().min(0).messages({
-        "number.base": "Quantity must be a number",
-        "number.min": "Quantity cannot be negative",
-        "any.required": "Quantity is required",
-    }),
     sku: Joi.string().trim().allow("").messages({
         "string.base": "SKU must be a string",
     }),
@@ -54,6 +51,8 @@ const variantSchema = Joi.object({
                     "string.empty": "Image URL is required",
                     "any.required": "Image URL is required",
                 }),
+                thumbnail: Joi.string().allow("").optional(),
+                medium: Joi.string().allow("").optional(),
                 altText: Joi.string()
                     .allow("")
                     .default("Variant image")
@@ -80,9 +79,11 @@ const productSchema = Joi.object({
         "number.min": "Weight must be a positive number",
         "any.required": "Weight is required",
     }),
-    quantity: Joi.number().required().min(0).messages({
+    quantity: Joi.number().required().min(0).max(50).integer().messages({
         "number.base": "Quantity must be a number",
-        "number.min": "Quantity must be a positive number",
+        "number.min": "Quantity cannot be negative",
+        "number.max": "Maximum available product quantity is 50",
+        "number.integer": "Quantity must be an integer",
         "any.required": "Quantity is required",
     }),
     description: Joi.string().required().max(1000).messages({
@@ -135,6 +136,8 @@ const productSchema = Joi.object({
                     "string.empty": "Image URL is required",
                     "any.required": "Image URL is required",
                 }),
+                thumbnail: Joi.string().allow("").optional(),
+                medium: Joi.string().allow("").optional(),
                 altText: Joi.string()
                     .allow("")
                     .default("Product image")
@@ -146,9 +149,18 @@ const productSchema = Joi.object({
         .messages({
             "array.base": "Images must be an array",
         }),
-    lowStockAlert: Joi.number().allow(null).default(null).messages({
-        "number.base": "Low stock alert must be a number",
-    }),
+    thumbnail: Joi.string().allow("").optional(),
+    image: Joi.string().allow("").optional(),
+    lowStockAlert: Joi.number()
+        .integer()
+        .min(1)
+        .max(2)
+        .default(2)
+        .messages({
+            "number.base": "Low stock alert must be a number",
+            "number.min": "Low stock alert must be at least 1",
+            "number.max": "Low stock alert threshold cannot exceed 2",
+        }),
     featured: Joi.boolean().messages({
         "boolean.base": "Featured flag must be a boolean",
     }),

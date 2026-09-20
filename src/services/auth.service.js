@@ -670,6 +670,7 @@ class AuthService {
                 populate: [
                     { path: "personalDocument", model: "File" },
                     { path: "businessDocument", model: "File" },
+                    { path: "storeLocation", model: "StoreLocation" },
                 ],
             });
 
@@ -704,10 +705,30 @@ class AuthService {
         user.role = normalizedRole;
         await user.save();
 
+        userCache.del(userId.toString());
+
         const token = user.generateAuthToken();
         const userObject = user.toObject();
         delete userObject.password;
         if (userObject.otp) delete userObject.otp.code;
+
+        userObject.phoneNumber = userObject.phoneNumber || null;
+        userObject.dob = userObject.dob || null;
+        userObject.addresses = userObject.addresses || [];
+        userObject.sellerId = userObject._id;
+        userObject.isSeller =
+            (userObject.roles && userObject.roles.includes("seller")) ||
+            userObject.role === "seller" ||
+            Boolean(userObject.business?.approved || userObject.business?.businessName);
+
+        if (!userObject.business || !userObject.business.businessName) {
+            userObject.business = null;
+            userObject.onboardingStatus = "uncompleted";
+        } else if (userObject.business.approved) {
+            userObject.onboardingStatus = "approved";
+        } else {
+            userObject.onboardingStatus = "pending";
+        }
 
         return {
             user: userObject,

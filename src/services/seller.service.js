@@ -9,6 +9,8 @@ import Review from "../models/review.model.js";
 import ProductViewed from "../models/productviewed.model.js";
 import fileService from "./file.service.js";
 import authService from "./auth.service.js";
+import notificationService from "./notification.service.js";
+import userCache from "../utils/userCache.js";
 
 class SellerService {
     static getSellers = async () => {
@@ -484,7 +486,7 @@ class SellerService {
     };
 
     onBoarding = async (userId, data) => {
-        const seller = await User.findById(userId);
+        const seller = await User.findById(userId).select("+business +bank");
 
         if (!seller) {
             throw new AppError("User not found", 404);
@@ -492,6 +494,21 @@ class SellerService {
 
         if (seller.business?.approved) {
             throw new AppError("Business already approved", 400);
+        }
+
+        // Prevent collision: ensure phone number is not used by another user
+        if (data.phoneNumber) {
+            const phoneExists = await User.findOne({
+                _id: { $ne: userId },
+                phoneNumber: data.phoneNumber,
+                deleted: { $ne: true },
+            });
+            if (phoneExists) {
+                throw new AppError(
+                    "Phone number is already associated with another account",
+                    400
+                );
+            }
         }
 
         const extractId = (val) => {
@@ -516,7 +533,6 @@ class SellerService {
         if (personalDocId && mongoose.Types.ObjectId.isValid(personalDocId)) {
             const personalDocument = await fileService.hasFile(personalDocId);
             if (!personalDocument) {
-                // If not found in file table, keep null or id
                 personalDocId = null;
             }
         } else if (personalDocId && !mongoose.Types.ObjectId.isValid(personalDocId)) {
@@ -536,44 +552,114 @@ class SellerService {
             storeLocationId = null;
         }
 
-        const user = {
-            role: "seller",
-            deleted: false,
-            deletedAt: null,
-            name: data.name,
-            phoneNumber: data.phoneNumber,
-            dob: data.dob,
-            addresses: [
-                {
-                    fullName: data.name,
-                    ...data.address,
-                },
-            ],
-            bank: {
-                bankName: data.bank?.bankName,
-                accountNumber: data.bank?.accountNumber?.toString(),
-                accountName: data.bank?.accountName,
-                bankCode: data.bank?.bankCode?.toString(),
-                bvn: data.bank?.bvn,
-            },
-            business: {
-                message: "",
-                approved: false,
-                businessName: data.businessName,
-                businessType: data.businessType,
-                businessAddress: {
-                    fullName: data.name,
-                    ...data.businessAddress,
-                },
-                businessPhone: data.businessPhone,
-                businessEmail: data.businessEmail,
-                documentType: data.documentType,
-                personalDocument: personalDocId,
-                businessDocument: businessDocId,
-                storeLocation: storeLocationId,
-            },
+        // Sync personal address
+        const personalAddress = {
+            fullName: data.name || seller.name,
+            addressLine1: data.address?.addressLine1 || "",
+            addressLine2: data.address?.addressLine2 || "",
+            city: data.address?.city || "",
+            state: data.address?.state || "",
+            country: data.address?.country || "NG",
+            phoneNumber: data.phoneNumber || seller.phoneNumber,
+            isDefault: true,
         };
-        return await User.updateOne({ _id: userId }, { $set: user });
+
+        let addresses = seller.addresses || [];
+        if (addresses.length === 0) {
+            addresses = [personalAddress];
+        } else {
+            addresses[0] = {
+                ...(addresses[0].toObject ? addresses[0].toObject() : addresses[0]),
+                ...personalAddress,
+            };
+        }
+
+        // Ensure roles include seller
+        const roles = Array.isArray(seller.roles)
+            ? [...seller.roles]
+            : [seller.role || "buyer"];
+        if (!roles.includes("seller")) roles.push("seller");
+        if (!roles.includes("buyer")) roles.push("buyer");
+
+        const businessData = {
+            message: "",
+            approved: false,
+            businessName: data.businessName,
+            businessType: data.businessType,
+            businessAddress: {
+                fullName: data.name || seller.name,
+                ...data.businessAddress,
+            },
+            businessPhone: data.businessPhone,
+            businessEmail: data.businessEmail,
+            documentType: data.documentType || "id",
+            personalDocument: personalDocId,
+            businessDocument: businessDocId,
+            storeLocation: storeLocationId,
+        };
+
+        const bankData = {
+            bankName: data.bank?.bankName,
+            accountNumber: data.bank?.accountNumber?.toString(),
+            accountName: data.bank?.accountName,
+            bankCode: data.bank?.bankCode?.toString(),
+            bvn: data.bank?.bvn || "",
+        };
+
+        // Update User document
+        seller.name = data.name || seller.name;
+        seller.phoneNumber = data.phoneNumber || seller.phoneNumber;
+        seller.dob = data.dob || seller.dob;
+        seller.role = "seller";
+        seller.roles = roles;
+        seller.addresses = addresses;
+        seller.bank = bankData;
+        seller.business = businessData;
+
+        await seller.save();
+
+        // Clear cache
+        userCache.del(userId.toString());
+
+        // 1. Notify Seller
+        try {
+            await notificationService.send(
+                userId,
+                "Seller Application Received",
+                `Hello ${seller.name},\n\nYour seller onboarding application for **${data.businessName}** has been received successfully. Our compliance and verification team is currently reviewing your documents. You will be notified as soon as your account is approved.`
+            );
+        } catch (err) {
+            console.error("[SellerService] Failed to send seller onboarding notification:", err.message);
+        }
+
+        // 2. Notify Admins
+        try {
+            const admins = await User.find({
+                role: { $in: ["admin", "superAdmin"] },
+                deleted: { $ne: true },
+            }).select("_id");
+            for (const admin of admins) {
+                await notificationService.send(
+                    admin._id,
+                    "New Seller Onboarding Application",
+                    `Seller **${seller.name}** (${seller.email}) has submitted onboarding details and KYC documents for **${data.businessName}**. Please review their application in the Admin Portal.`,
+                    {
+                        actionUrl: `/admin/sellers/${seller._id}`,
+                        actionText: "Review Seller",
+                    }
+                );
+            }
+        } catch (err) {
+            console.error("[SellerService] Failed to notify admins about seller onboarding:", err.message);
+        }
+
+        const userObj = await this.getUserById(userId);
+        const token = seller.generateAuthToken();
+
+        return {
+            user: userObj,
+            token,
+        };
     };
 
     getUserById = async (id) => {
@@ -584,8 +670,13 @@ class SellerService {
                 populate: [
                     { path: "personalDocument", model: "File" },
                     { path: "businessDocument", model: "File" },
+                    { path: "storeLocation", model: "StoreLocation" },
                 ],
             });
+
+        if (!user) {
+            throw new AppError("Seller not found", 404);
+        }
 
         if (user && user.wallet) {
             let changed = false;
@@ -615,7 +706,31 @@ class SellerService {
             }
         }
 
-        return user;
+        const userObj = user.toObject ? user.toObject() : { ...user };
+        delete userObj.password;
+        if (userObj.otp) delete userObj.otp.code;
+
+        // Ensure fields exist gracefully
+        userObj.phoneNumber = userObj.phoneNumber || null;
+        userObj.dob = userObj.dob || null;
+        userObj.addresses = userObj.addresses || [];
+        userObj.sellerId = userObj._id;
+        userObj.isSeller =
+            (userObj.roles && userObj.roles.includes("seller")) ||
+            userObj.role === "seller" ||
+            Boolean(userObj.business?.approved || userObj.business?.businessName);
+
+        // Onboarding status flag
+        if (!userObj.business || !userObj.business.businessName) {
+            userObj.business = null;
+            userObj.onboardingStatus = "uncompleted";
+        } else if (userObj.business.approved) {
+            userObj.onboardingStatus = "approved";
+        } else {
+            userObj.onboardingStatus = "pending";
+        }
+
+        return userObj;
     };
 
     // Get comprehensive store statistics for a seller

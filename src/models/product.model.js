@@ -29,6 +29,7 @@ const variantSchema = new mongoose.Schema({
         type: Number,
         required: [true, "Please provide variant quantity"],
         min: [0, "Quantity cannot be negative"],
+        max: [50, "Maximum available quantity is 50"],
         default: 0,
     },
     weight: {
@@ -43,6 +44,12 @@ const variantSchema = new mongoose.Schema({
     },
     images: [
         {
+            thumbnail: {
+                type: String,
+            },
+            medium: {
+                type: String,
+            },
             url: {
                 type: String,
                 required: true,
@@ -136,6 +143,8 @@ const productSchema = new mongoose.Schema(
             type: Number,
             required: [true, "Please provide product quantity"],
             min: [0, "Quantity cannot be negative"],
+            max: [50, "Maximum available quantity is 50"],
+            default: 1,
         },
         promoPrice: {
             type: Number,
@@ -175,6 +184,12 @@ const productSchema = new mongoose.Schema(
         },
         images: [
             {
+                thumbnail: {
+                    type: String,
+                },
+                medium: {
+                    type: String,
+                },
                 url: {
                     type: String,
                     required: true,
@@ -185,6 +200,14 @@ const productSchema = new mongoose.Schema(
                 },
             },
         ],
+        thumbnail: {
+            type: String,
+            default: null,
+        },
+        image: {
+            type: String,
+            default: null,
+        },
         featured: {
             type: Boolean,
             default: false,
@@ -215,7 +238,9 @@ const productSchema = new mongoose.Schema(
         },
         lowStockAlert: {
             type: Number,
-            default: null,
+            default: 2,
+            min: [1, "Low stock alert must be at least 1"],
+            max: [2, "Low stock alert threshold cannot exceed 2"],
         },
         deleted: {
             type: Boolean,
@@ -300,6 +325,8 @@ productSchema.index({ rating: -1 });
 productSchema.index({ featured: 1 });
 productSchema.index({ brand: 1 });
 productSchema.index({ user: 1, deleted: 1 });
+productSchema.index({ status: 1, createdAt: -1 });
+productSchema.index({ category: 1, createdAt: -1 });
 
 // High-speed compound indexes for active marketplace catalog queries
 productSchema.index({ deleted: 1, approved: 1, disabled: 1, category: 1, createdAt: -1 });

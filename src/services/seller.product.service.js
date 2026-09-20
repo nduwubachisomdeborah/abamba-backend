@@ -100,6 +100,24 @@ class SellerProductService {
             }
         }
 
+        // Enforce max 50 for stock and bounds for lowStockAlert
+        if (productData.quantity !== undefined) {
+            productData.quantity = Math.min(Math.max(Number(productData.quantity) || 0, 0), 50);
+        }
+        if (productData.lowStockAlert !== undefined && productData.lowStockAlert !== null) {
+            productData.lowStockAlert = Math.min(Math.max(Number(productData.lowStockAlert) || 2, 1), 2);
+        } else {
+            productData.lowStockAlert = 2;
+        }
+
+        // Enforce variant quantities if present
+        if (Array.isArray(productData.variants)) {
+            productData.variants = productData.variants.map((v) => ({
+                ...v,
+                quantity: v.quantity !== undefined ? Math.min(Math.max(Number(v.quantity) || 0, 0), 50) : 0,
+            }));
+        }
+
         // Handle promotional pricing
         if (
             productData.promoPrice !== undefined &&
@@ -322,6 +340,20 @@ class SellerProductService {
             }
         }
 
+        // Enforce max 50 for stock and bounds for lowStockAlert
+        if (updateData.quantity !== undefined) {
+            updateData.quantity = Math.min(Math.max(Number(updateData.quantity) || 0, 0), 50);
+        }
+        if (updateData.lowStockAlert !== undefined && updateData.lowStockAlert !== null) {
+            updateData.lowStockAlert = Math.min(Math.max(Number(updateData.lowStockAlert) || 2, 1), 2);
+        }
+        if (Array.isArray(updateData.variants)) {
+            updateData.variants = updateData.variants.map((v) => ({
+                ...v,
+                quantity: v.quantity !== undefined ? Math.min(Math.max(Number(v.quantity) || 0, 0), 50) : 0,
+            }));
+        }
+
         // Update the product
         Object.keys(updateData).forEach((key) => {
             product[key] = updateData[key];
@@ -496,6 +528,10 @@ class SellerProductService {
             }
         }
 
+        if (variantData.quantity !== undefined) {
+            variantData.quantity = Math.min(Math.max(Number(variantData.quantity) || 0, 0), 50);
+        }
+
         // Add the variant
         product.variants.push(variantData);
         await product.save();
@@ -560,6 +596,10 @@ class SellerProductService {
                     );
                 }
             }
+        }
+
+        if (updateData.quantity !== undefined) {
+            updateData.quantity = Math.min(Math.max(Number(updateData.quantity) || 0, 0), 50);
         }
 
         // Update the variant

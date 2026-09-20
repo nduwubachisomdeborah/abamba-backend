@@ -254,6 +254,33 @@ class PaystackService {
             merchantReceives: targetAmount,
         };
     }
+
+    async createSubaccount({
+        business_name,
+        settlement_bank,
+        account_number,
+        percentage_charge = 0,
+        description,
+    }) {
+        const payload = {
+            business_name,
+            settlement_bank: String(settlement_bank),
+            account_number: String(account_number),
+            percentage_charge,
+            description: description || `Subaccount for ${business_name}`,
+        };
+
+        try {
+            const response = await this.api.post("/subaccount", payload);
+            return response.data;
+        } catch (error) {
+            console.error(
+                "[PaystackService] createSubaccount failed:",
+                error?.response?.data || error.message
+            );
+            return null;
+        }
+    }
 }
 
 export default new PaystackService();

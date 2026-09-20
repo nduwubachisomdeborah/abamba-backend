@@ -51,7 +51,7 @@ router.post("/resend-otp", SellerController.resendOTP);
 router.post(
     "/onboard",
     authenticate,
-    restrictTo("seller"),
+    restrictTo("seller", "user", "buyer", "customer"),
     validate(sellerOnBoardingSchema),
     SellerController.onBoarding,
 );
@@ -60,7 +60,7 @@ router.get("/bank/list", SellerController.getBanks);
 router.get(
     "/bank/resolve",
     authenticate,
-    restrictTo("seller"),
+    restrictTo("seller", "user", "buyer", "customer"),
     SellerController.resolveBankAccount,
 );
 router.patch(
@@ -88,7 +88,7 @@ router.get(
 router.get(
     "/me",
     authenticate,
-    restrictTo("seller"),
+    restrictTo("seller", "user", "buyer", "customer"),
     SellerController.getSeller,
 );
 

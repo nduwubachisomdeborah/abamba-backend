@@ -26,9 +26,10 @@ const variantSchema = Joi.object({
     }),
     promoPrice: Joi.number().min(0).allow(null).optional(),
     bonusPrice: Joi.number().min(0).allow(null).optional(),
-    quantity: Joi.number().required().min(0).integer().messages({
+    quantity: Joi.number().required().min(0).max(50).integer().messages({
         "number.base": "Variant quantity must be a number",
         "number.min": "Variant quantity cannot be negative",
+        "number.max": "Maximum available variant quantity is 50",
         "number.integer": "Variant quantity must be an integer",
         "any.required": "Variant quantity is required",
     }),
@@ -41,6 +42,8 @@ const variantSchema = Joi.object({
                 "string.empty": "Image URL is required",
                 "any.required": "Image URL is required",
             }),
+            thumbnail: Joi.string().allow("").optional(),
+            medium: Joi.string().allow("").optional(),
             altText: Joi.string().default("Variant image"),
         })
     ),
@@ -81,9 +84,13 @@ export const createProductSchema = Joi.object({
                 "string.empty": "Image URL is required",
                 "any.required": "Image URL is required",
             }),
+            thumbnail: Joi.string().allow("").optional(),
+            medium: Joi.string().allow("").optional(),
             altText: Joi.string().default("Product image"),
         })
     ),
+    thumbnail: Joi.string().allow("").optional(),
+    image: Joi.string().allow("").optional(),
     featured: Joi.boolean().default(false),
     rating: Joi.number().min(0).max(5).default(0).messages({
         "number.base": "Rating must be a number",
@@ -95,6 +102,22 @@ export const createProductSchema = Joi.object({
         "number.min": "Number of reviews cannot be negative",
         "number.integer": "Number of reviews must be an integer",
     }),
+    quantity: Joi.number().min(0).max(50).integer().messages({
+        "number.base": "Quantity must be a number",
+        "number.min": "Quantity cannot be negative",
+        "number.max": "Maximum available product quantity is 50",
+        "number.integer": "Quantity must be an integer",
+    }),
+    lowStockAlert: Joi.number()
+        .integer()
+        .min(1)
+        .max(2)
+        .default(2)
+        .messages({
+            "number.base": "Low stock alert must be a number",
+            "number.min": "Low stock alert must be at least 1",
+            "number.max": "Low stock alert threshold cannot exceed 2",
+        }),
     variants: Joi.array().items(variantSchema),
     hasVariants: Joi.boolean().default(false),
 });
@@ -141,6 +164,21 @@ export const updateProductSchema = Joi.object({
         "number.min": "Number of reviews cannot be negative",
         "number.integer": "Number of reviews must be an integer",
     }),
+    quantity: Joi.number().min(0).max(50).integer().messages({
+        "number.base": "Quantity must be a number",
+        "number.min": "Quantity cannot be negative",
+        "number.max": "Maximum available product quantity is 50",
+        "number.integer": "Quantity must be an integer",
+    }),
+    lowStockAlert: Joi.number()
+        .integer()
+        .min(1)
+        .max(2)
+        .messages({
+            "number.base": "Low stock alert must be a number",
+            "number.min": "Low stock alert must be at least 1",
+            "number.max": "Low stock alert threshold cannot exceed 2",
+        }),
     variants: Joi.array().items(variantSchema),
     hasVariants: Joi.boolean(),
 });
@@ -150,9 +188,10 @@ export { variantSchema };
 
 // Schema for updating variant stock
 export const updateVariantStockSchema = Joi.object({
-    quantity: Joi.number().required().min(0).integer().messages({
+    quantity: Joi.number().required().min(0).max(50).integer().messages({
         "number.base": "Quantity must be a number",
         "number.min": "Quantity cannot be negative",
+        "number.max": "Maximum available quantity is 50",
         "number.integer": "Quantity must be an integer",
         "any.required": "Quantity is required",
     }),

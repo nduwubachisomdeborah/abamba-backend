@@ -443,15 +443,22 @@ userSchema.methods.passwordChangedAfter = function (JWTTimestamp) {
 
 // Generate JWT token
 userSchema.methods.generateAuthToken = function () {
+    const isSeller =
+        (this.roles && this.roles.includes("seller")) ||
+        this.role === "seller" ||
+        Boolean(this.business?.approved || this.business?.businessName);
+
     return jwt.sign(
         {
             id: this._id,
+            sellerId: this._id,
             role: this.role,
             roles: this.roles || [this.role],
+            isSeller,
         },
         process.env.JWT_SECRET,
         {
-            expiresIn: process.env.JWT_EXPIRES_IN,
+            expiresIn: process.env.JWT_EXPIRES_IN || "30d",
         }
     );
 };
