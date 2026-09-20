@@ -253,42 +253,61 @@ class ProductService {
             }
         }
 
-        // Add price range filter if provided (for basePrice and variant prices)
-        if (query.minPrice || query.maxPrice) {
-            // Create a complex query for both basePrice and variant prices
-            const priceConditions = [];
+        // Add price range filter if provided (supports minPrice/maxPrice, priceMin/priceMax, and price[gte]/price[lte])
+        const minPriceVal =
+            query.minPrice ??
+            query.priceMin ??
+            (typeof query.price === "object" ? query.price?.gte ?? query.price?.$gte : undefined) ??
+            query["price[gte]"] ??
+            query["price[$gte]"];
 
-            // Base price condition
-            const basePriceCondition = {};
-            if (query.minPrice)
-                basePriceCondition.basePrice = { $gte: Number(query.minPrice) };
-            if (query.maxPrice)
-                basePriceCondition.basePrice = {
-                    ...basePriceCondition.basePrice,
-                    $lte: Number(query.maxPrice),
-                };
+        const maxPriceVal =
+            query.maxPrice ??
+            query.priceMax ??
+            (typeof query.price === "object" ? query.price?.lte ?? query.price?.$lte : undefined) ??
+            query["price[lte]"] ??
+            query["price[$lte]"];
 
-            if (Object.keys(basePriceCondition).length > 0) {
-                priceConditions.push(basePriceCondition);
+        if (minPriceVal !== undefined || maxPriceVal !== undefined) {
+            const priceQuery = {};
+            const numMin = Number(minPriceVal);
+            const numMax = Number(maxPriceVal);
+
+            if (!isNaN(numMin) && minPriceVal !== "" && minPriceVal !== null) {
+                priceQuery.$gte = numMin;
+            }
+            if (!isNaN(numMax) && maxPriceVal !== "" && maxPriceVal !== null) {
+                priceQuery.$lte = numMax;
             }
 
-            // Variant price condition
-            if (query.minPrice || query.maxPrice) {
-                const variantPriceCondition = { "variants.price": {} };
-                if (query.minPrice)
-                    variantPriceCondition["variants.price"].$gte = Number(
-                        query.minPrice,
-                    );
-                if (query.maxPrice)
-                    variantPriceCondition["variants.price"].$lte = Number(
-                        query.maxPrice,
-                    );
+            if (Object.keys(priceQuery).length > 0) {
+                const priceConditions = [
+                    { basePrice: priceQuery },
+                    { price: priceQuery },
+                    { "variants.price": priceQuery },
+                ];
 
-                priceConditions.push(variantPriceCondition);
+                if (filter.$or) {
+                    filter.$and = filter.$and || [];
+                    filter.$and.push({ $or: priceConditions });
+                } else {
+                    filter.$or = priceConditions;
+                }
             }
+        }
 
-            if (priceConditions.length > 0) {
-                filter.$or = priceConditions;
+        // Add rating filter if provided (supports rating, minRating, rating[gte] with $gte)
+        const ratingVal =
+            query.rating ??
+            query.minRating ??
+            (typeof query.rating === "object" ? query.rating?.gte ?? query.rating?.$gte : undefined) ??
+            query["rating[gte]"] ??
+            query["rating[$gte]"];
+
+        if (ratingVal !== undefined && ratingVal !== "" && ratingVal !== null) {
+            const numRating = Number(ratingVal);
+            if (!isNaN(numRating)) {
+                filter.rating = { $gte: numRating };
             }
         }
 
