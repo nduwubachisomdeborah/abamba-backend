@@ -62,6 +62,17 @@ class CartController {
     
     return successResponse(res, 'Cart cleared successfully', cart);
   });
+
+  /**
+   * @desc    Merge guest cart into user cart
+   * @route   POST /api/v1/cart/merge
+   * @access  Private
+   */
+  static mergeCart = asyncHandler(async (req, res) => {
+    const cart = await cartService.mergeCart(req.user.id, req.body);
+
+    return successResponse(res, 'Guest cart merged successfully', cart);
+  });
 }
 
 export default CartController;

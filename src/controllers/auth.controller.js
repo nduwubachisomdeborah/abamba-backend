@@ -14,14 +14,31 @@ class AuthController {
      * @access  Public
      */
     static signup = asyncHandler(async (req, res) => {
-        const { name, email, phoneNumber, password } = req.body;
-
-        const result = await authService.signup({
+        const {
             name,
             email,
             phoneNumber,
             password,
-        });
+            guestToken,
+            guestId,
+            cartItems,
+            items,
+        } = req.body;
+
+        const result = await authService.signup(
+            {
+                name,
+                email,
+                phoneNumber,
+                password,
+            },
+            "user",
+            {
+                guestToken,
+                guestId,
+                cartItems: cartItems || items,
+            }
+        );
 
         return sendResponse(
             res,
@@ -70,9 +87,14 @@ class AuthController {
      * @access  Public
      */
     static verifyOTP = asyncHandler(async (req, res) => {
-        const { email, otpCode } = req.body;
+        const { email, otpCode, guestToken, guestId, cartItems, items } =
+            req.body;
 
-        const result = await authService.verifyOTP(email, otpCode);
+        const result = await authService.verifyOTP(email, otpCode, "user", {
+            guestToken,
+            guestId,
+            cartItems: cartItems || items,
+        });
 
         return successResponse(res, "OTP verified successfully", {
             user: result.user,
@@ -110,13 +132,17 @@ class AuthController {
      * @access  Public
      */
     static googleSignIn = asyncHandler(async (req, res) => {
-        const { idToken } = req.body;
+        const { idToken, guestToken, guestId, cartItems, items } = req.body;
 
         if (!idToken) {
             return errorResponse(res, "Google ID token is required", 400);
         }
 
-        const result = await authService.googleSignIn(idToken);
+        const result = await authService.googleSignIn(idToken, {
+            guestToken,
+            guestId,
+            cartItems: cartItems || items,
+        });
 
         return successResponse(res, "Google sign-in successful", {
             user: result.user,

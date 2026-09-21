@@ -1092,6 +1092,179 @@ class PaymentService {
         };
     }
 
+    async initializePaymentForOrder(orderId, userId, options = {}) {
+        const { provider = "paystack", callbackUrl } = options;
+        const user = await User.findById(userId);
+        if (!user) throw new AppError("User not found", 404);
+        if (user.isGuest) {
+            throw new AppError(
+                "Guest checkout is not permitted. Please sign up or log in.",
+                403
+            );
+        }
+
+        // Try finding by OrderHolder or Order
+        let holder = null;
+        if (mongoose.Types.ObjectId.isValid(orderId)) {
+            holder =
+                (await OrderHolder.findOne({ _id: orderId, user: userId })) ||
+                (await OrderHolder.findOne({ orders: orderId, user: userId }));
+        } else if (!isNaN(orderId)) {
+            holder = await OrderHolder.findOne({
+                orderId: Number(orderId),
+                user: userId,
+            });
+        }
+
+        let order = null;
+        if (!holder) {
+            if (mongoose.Types.ObjectId.isValid(orderId)) {
+                order = await Order.findOne({ _id: orderId, user: userId });
+            } else if (!isNaN(orderId)) {
+                order = await Order.findOne({
+                    orderId: Number(orderId),
+                    user: userId,
+                });
+            }
+            if (order?.orderHolder) {
+                holder = await OrderHolder.findById(order.orderHolder);
+            }
+        }
+
+        if (!holder && !order) {
+            throw new AppError("Order not found", 404);
+        }
+
+        const totalAmount = holder ? holder.total : order.total;
+        const primaryId = (holder?._id || order?._id).toString();
+        const primaryOrderNum =
+            holder?.orderId || order?.orderId || `ORD-${primaryId}`;
+
+        // Create or reuse payment
+        let payment = null;
+        if (holder?.payment) {
+            payment = await Payment.findById(holder.payment);
+        }
+        if (!payment) {
+            payment = new Payment({
+                user: userId,
+                amount: totalAmount,
+                method: "credit_card",
+                provider,
+                status: "pending",
+                metadata: {
+                    orderHolderId: holder?._id?.toString() || primaryId,
+                    userId: userId.toString(),
+                },
+            });
+            await payment.save();
+            if (holder) {
+                holder.payment = payment._id;
+                await holder.save();
+            }
+        }
+
+        let init = null;
+        if (provider === "paystack") {
+            const passFee =
+                process.env.PASS_PAYSTACK_FEE_TO_CUSTOMER === "true";
+            const newAmount = passFee
+                ? paystackService.addFee(totalAmount)
+                : {
+                      customerPays: totalAmount,
+                      merchantReceives: totalAmount,
+                      fee: 0,
+                  };
+            const reference = `ABM_${primaryId}_${Date.now()}`;
+            payment.reference = reference;
+            payment.provider = "paystack";
+            await payment.save();
+
+            try {
+                init = await paystackService.initializeTransaction({
+                    email: user.email,
+                    amount: newAmount.customerPays,
+                    reference,
+                    callback_url:
+                        callbackUrl ||
+                        `${process.env.FRONTEND_URL || "https://www.abamba.com.ng"}/cart/checkout?step=submitted`,
+                    metadata: {
+                        orderHolderId: holder?._id?.toString() || primaryId,
+                        paymentId: payment._id.toString(),
+                        orderId: primaryId,
+                        userId: user._id.toString(),
+                        custom_fields: [
+                            {
+                                display_name: "Order ID",
+                                variable_name: "order_id",
+                                value: primaryId,
+                            },
+                        ],
+                    },
+                });
+            } catch (pErr) {
+                const pMsg =
+                    pErr?.response?.data?.message ||
+                    pErr?.message ||
+                    "Paystack initialization failed";
+                console.error(
+                    "[PaymentService] Paystack initialization error:",
+                    pMsg
+                );
+                throw new AppError(pMsg, 400);
+            }
+        } else if (provider === "funz") {
+            const reference = funzService.getReference();
+            payment.reference = reference;
+            payment.provider = "funz";
+            await payment.save();
+
+            try {
+                const funzResult = await funzService.initializeTransaction({
+                    email: user.email,
+                    amount: totalAmount,
+                    reference,
+                    customerName: user.name || user.email,
+                    phoneNumber: user.phoneNumber || user.phone || 0,
+                    description: `Order #${primaryOrderNum}`,
+                    callbackUrl: callbackUrl || undefined,
+                    metadata: [
+                        holder?._id?.toString() || primaryId,
+                        payment._id.toString(),
+                    ],
+                });
+                init = {
+                    status: "success",
+                    message: funzResult.message || "Authorization URL created",
+                    data: {
+                        authorization_url: funzResult.payment_url,
+                        access_code: null,
+                        reference,
+                    },
+                };
+            } catch (fErr) {
+                const fMsg =
+                    fErr?.response?.data?.message ||
+                    fErr?.message ||
+                    "Funz initialization failed";
+                console.error("[PaymentService] Funz initialization error:", fMsg);
+                throw new AppError(fMsg, 400);
+            }
+        }
+
+        return {
+            orderId: primaryId,
+            orderNumber: primaryOrderNum,
+            totalAmount,
+            provider,
+            reference: payment.reference,
+            authorization_url:
+                init?.data?.authorization_url || init?.authorization_url,
+            access_code: init?.data?.access_code || init?.access_code,
+            providerInit: init,
+        };
+    }
+
     getPaymentProviders() {
         return [
             {

@@ -455,6 +455,7 @@ userSchema.methods.generateAuthToken = function () {
             role: this.role,
             roles: this.roles || [this.role],
             isSeller,
+            isGuest: Boolean(this.isGuest),
         },
         process.env.JWT_SECRET,
         {

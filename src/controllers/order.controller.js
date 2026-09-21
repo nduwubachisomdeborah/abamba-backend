@@ -1,16 +1,24 @@
 import orderService from '../services/order.service.js';
 import paymentService from '../services/payment.service.js';
 import User from '../models/user.model.js';
-import { asyncHandler } from '../middlewares/error.js';
+import { asyncHandler, AppError } from '../middlewares/error.js';
 import { successResponse } from '../utils/response.util.js';
 
 class OrderController {
   /**
    * @desc    Create a new order
    * @route   POST /api/v1/orders
-   * @access  Private
+   * @access  Private (Registered User)
    */
   static createOrder = asyncHandler(async (req, res) => {
+    // Strictly disallow guest accounts from placing orders
+    if (req.user?.isGuest || req.user?.role === 'guest' || req.decodedToken?.isGuest) {
+      throw new AppError(
+        'Guest checkout is not permitted. Please sign up or log in to place an order.',
+        403
+      );
+    }
+
     const shippingAddress = req.body.shippingAddress;
     const addressId = req.body.addressId;
     const isPickup = Boolean(
@@ -45,6 +53,36 @@ class OrderController {
           });
         }
         req.body.shippingAddress = defaultAddr;
+      }
+    } else if (shippingAddress && typeof shippingAddress === 'object' && !isPickup) {
+      // Automatically attach shipping address to user profile if not already saved
+      try {
+        const user = await User.findById(req.user.id);
+        if (user) {
+          user.addresses = user.addresses || [];
+          const alreadyExists = user.addresses.some(
+            (a) =>
+              a.addressLine1?.toLowerCase() === shippingAddress.addressLine1?.toLowerCase() &&
+              a.city?.toLowerCase() === shippingAddress.city?.toLowerCase()
+          );
+
+          if (!alreadyExists && shippingAddress.addressLine1 && shippingAddress.city && shippingAddress.state) {
+            user.addresses.push({
+              fullName: shippingAddress.fullName || user.name || "Customer",
+              addressLine1: shippingAddress.addressLine1,
+              addressLine2: shippingAddress.addressLine2 || "",
+              city: shippingAddress.city,
+              state: shippingAddress.state,
+              zipCode: shippingAddress.zipCode || "000000",
+              country: shippingAddress.country || "NG",
+              phoneNumber: shippingAddress.phoneNumber || user.phoneNumber || "0000000000",
+              isDefault: user.addresses.length === 0 || Boolean(shippingAddress.isDefault || req.body.saveAddress),
+            });
+            await user.save();
+          }
+        }
+      } catch (addrErr) {
+        console.warn("Could not save address to user profile:", addrErr.message);
       }
     }
 
@@ -154,6 +192,39 @@ class OrderController {
     return successResponse(res, 'Payment information updated successfully', order);
   });
   
+  /**
+   * @desc    Initialize or retry payment for an order / order holder
+   * @route   POST /api/v1/orders/:id/payment/initialize or POST /api/v1/orders/payment/initialize
+   * @access  Private (Registered User)
+   */
+  static initializeOrderPayment = asyncHandler(async (req, res) => {
+    if (req.user?.isGuest || req.user?.role === 'guest' || req.decodedToken?.isGuest) {
+      throw new AppError(
+        'Guest checkout is not permitted. Please sign up or log in to initialize payment.',
+        403
+      );
+    }
+
+    const orderId = req.params.id || req.body.orderId || req.body.orderHolderId;
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Order ID is required to initialize payment',
+      });
+    }
+
+    const provider = req.body.provider || 'paystack';
+    const callbackUrl = req.body.callbackUrl;
+
+    const result = await paymentService.initializePaymentForOrder(
+      orderId,
+      req.user.id,
+      { provider, callbackUrl }
+    );
+
+    return successResponse(res, 'Payment initialized successfully', result);
+  });
+
   /**
    * @desc    Verify payment by reference and finalize orders in holder
    * @route   POST /api/v1/orders/payment/verify

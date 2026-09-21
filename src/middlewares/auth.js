@@ -235,12 +235,6 @@ export const optionalAuth = (authMiddleware = authenticate) => {
                 });
             });
 
-            // If authentication failed, continue without authentication
-            if (authError) {
-                req.user = null;
-                return next();
-            }
-
             // Authentication succeeded, continue with authenticated user
             next();
         } catch (error) {
@@ -250,3 +244,37 @@ export const optionalAuth = (authMiddleware = authenticate) => {
         }
     });
 };
+
+/**
+ * Middleware to require a registered, non-guest user account
+ * Rejects temporary or guest user tokens
+ */
+export const requireRegisteredUser = asyncHandler(async (req, res, next) => {
+    if (!req.user) {
+        return next(
+            new AppError(
+                "You are not logged in. Please log in to get access",
+                401
+            )
+        );
+    }
+
+    const isGuest =
+        req.user.isGuest === true ||
+        req.user.role === "guest" ||
+        req.decodedToken?.isGuest === true ||
+        req.decodedToken?.role === "guest";
+
+    if (isGuest) {
+        return next(
+            new AppError(
+                "Guest checkout is not permitted. Please sign up or log in to place an order.",
+                403
+            )
+        );
+    }
+
+    next();
+});
+
+export const requireAuth = requireRegisteredUser;

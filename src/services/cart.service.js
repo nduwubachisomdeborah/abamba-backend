@@ -7,6 +7,7 @@ import LogisticsCompany from "../models/logisticsCompany.model.js";
 import shipbubbleService from "./shiping/shipbubble.service.js";
 import addressService from "./address.service.js";
 import PlatformSettings from "../models/platformSettings.model.js";
+import jwt from "jsonwebtoken";
 
 class CartService {
     /**
@@ -824,6 +825,165 @@ class CartService {
         });
 
         return result;
+    }
+
+    /**
+     * Merge guest cart items into authenticated user's cart
+     * @param {string} userId - Authenticated user ID
+     * @param {Object} payload - Guest cart info ({ guestToken, guestId, items, cartItems })
+     * @returns {Promise<Object>} Populated updated user cart
+     */
+    async mergeCart(userId, payload = {}) {
+        if (!userId) {
+            throw new AppError("User ID is required to merge cart", 400);
+        }
+
+        const { guestToken, guestId } = payload;
+        const rawItems = payload.items || payload.cartItems || [];
+
+        // Collect possible guest identifiers
+        const guestIdCandidates = [];
+        if (guestId && typeof guestId === "string" && guestId.trim()) {
+            guestIdCandidates.push(guestId.trim());
+        }
+
+        if (guestToken && typeof guestToken === "string") {
+            try {
+                const decoded = jwt.verify(guestToken, process.env.JWT_SECRET);
+                if (decoded?.id) guestIdCandidates.push(decoded.id.toString());
+                if (decoded?.guestId) guestIdCandidates.push(decoded.guestId.toString());
+            } catch (err) {
+                try {
+                    const decoded = jwt.decode(guestToken);
+                    if (decoded?.id) guestIdCandidates.push(decoded.id.toString());
+                    if (decoded?.guestId) guestIdCandidates.push(decoded.guestId.toString());
+                } catch (decodeErr) {
+                    console.warn("[CartService] Could not decode guestToken:", decodeErr.message);
+                }
+            }
+        }
+
+        // Find existing guest cart(s) in database
+        const objectIdCandidates = guestIdCandidates.filter((id) =>
+            mongoose.Types.ObjectId.isValid(id)
+        );
+
+        let guestCarts = [];
+        if (guestIdCandidates.length > 0) {
+            guestCarts = await Cart.find({
+                $or: [
+                    { guestId: { $in: guestIdCandidates } },
+                    ...(objectIdCandidates.length > 0
+                        ? [{ user: { $in: objectIdCandidates } }]
+                        : []),
+                ],
+            });
+        }
+
+        // Get or create user cart
+        let userCart = await Cart.findOne({ user: userId });
+        if (!userCart) {
+            userCart = await this.createCart(userId);
+        }
+
+        // Aggregate all items to merge from DB guest carts and payload items
+        const itemsToMerge = [];
+
+        for (const gCart of guestCarts) {
+            if (Array.isArray(gCart.items)) {
+                itemsToMerge.push(...gCart.items);
+            }
+        }
+
+        if (Array.isArray(rawItems) && rawItems.length > 0) {
+            itemsToMerge.push(...rawItems);
+        }
+
+        if (itemsToMerge.length === 0) {
+            return await this.populateCart(userCart);
+        }
+
+        // Process and merge each item into userCart
+        for (const item of itemsToMerge) {
+            const rawProd = item.product || item.productId || item._id;
+            const productId = rawProd?._id ? rawProd._id.toString() : rawProd?.toString();
+            const variantId = (item.variant || item.variantId || null)?.toString() || null;
+            const quantity = Math.max(1, Number(item.quantity) || 1);
+
+            if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+                continue;
+            }
+
+            const product = await Product.findOne({
+                _id: productId,
+                deleted: false,
+            });
+            if (!product) continue;
+
+            let maxStock = product.quantity || 0;
+            let price = Number(product.basePrice) || 0;
+
+            if (variantId) {
+                const variant = product.variants?.id?.(variantId);
+                if (!variant) continue;
+                maxStock = variant.quantity || 0;
+                price = Number(variant.price) || price;
+            }
+
+            if (maxStock <= 0) continue;
+
+            // Find matching item in user cart
+            const existingIndex = userCart.items.findIndex((it) => {
+                const itProdId = it.product?._id ? it.product._id.toString() : it.product?.toString();
+                const itVarId = it.variant ? it.variant.toString() : null;
+                return itProdId === productId && itVarId === variantId;
+            });
+
+            if (existingIndex > -1) {
+                const currentQty = userCart.items[existingIndex].quantity || 0;
+                userCart.items[existingIndex].quantity = Math.min(
+                    currentQty + quantity,
+                    maxStock
+                );
+                if (item.shipping && !userCart.items[existingIndex].shipping) {
+                    userCart.items[existingIndex].shipping = item.shipping;
+                }
+            } else {
+                userCart.items.push({
+                    product: productId,
+                    variant: variantId,
+                    quantity: Math.min(quantity, maxStock),
+                    price: Number(item.price) || price,
+                    shipping: item.shipping || {
+                        amount: 3000,
+                        price: 3000,
+                        total: 3000,
+                        fee: 3000,
+                        service_code: "richmond",
+                        carrierId: "richmond",
+                        carrierName: "RichmondLogistics",
+                        request_token: "REQ-REGIONAL",
+                    },
+                });
+            }
+        }
+
+        await userCart.save();
+
+        // Clean up guest carts from DB
+        if (guestCarts.length > 0) {
+            const guestCartIds = guestCarts.map((c) => c._id);
+            await Cart.deleteMany({ _id: { $in: guestCartIds } });
+        }
+
+        return await this.populateCart(userCart);
+    }
+
+    /**
+     * Alias for mergeCart
+     */
+    async migrateGuestCart(userId, payload = {}) {
+        return await this.mergeCart(userId, payload);
     }
 }
 

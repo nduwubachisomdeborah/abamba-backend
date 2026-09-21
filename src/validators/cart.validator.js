@@ -47,6 +47,25 @@ export const updateQuantitySchema = Joi.object({
     }),
 });
 
+// Schema for merging guest cart
+export const mergeCartSchema = Joi.object({
+    guestToken: Joi.string().allow(null, "").optional(),
+    guestId: Joi.string().allow(null, "").optional(),
+    items: Joi.array()
+        .items(
+            Joi.object({
+                productId: Joi.string().required(),
+                variantId: Joi.string().allow(null, "").optional(),
+                quantity: Joi.number().integer().min(1).default(1).optional(),
+                price: Joi.number().min(0).optional(),
+                shipping: Joi.any().optional(),
+            }).unknown(true)
+        )
+        .optional(),
+    cartItems: Joi.array().items(Joi.object().unknown(true)).optional(),
+}).unknown(true);
+
 // Create validation middleware functions
 export const validateAddItem = validate(addItemSchema);
 export const validateUpdateQuantity = validate(updateQuantitySchema);
+export const validateMergeCart = validate(mergeCartSchema);

@@ -37,7 +37,11 @@ export const signupSchema = Joi.object({
                 "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
             "any.required": "Password is required",
         }),
-});
+    guestToken: Joi.string().allow(null, "").optional(),
+    guestId: Joi.string().allow(null, "").optional(),
+    cartItems: Joi.array().items(Joi.object().unknown(true)).optional(),
+    items: Joi.array().items(Joi.object().unknown(true)).optional(),
+}).unknown(true);
 
 // Schema for user login
 export const loginSchema = Joi.object({
@@ -52,7 +56,11 @@ export const loginSchema = Joi.object({
         "string.empty": "Password is required",
         "any.required": "Password is required",
     }),
-});
+    guestToken: Joi.string().allow(null, "").optional(),
+    guestId: Joi.string().allow(null, "").optional(),
+    cartItems: Joi.array().items(Joi.object().unknown(true)).optional(),
+    items: Joi.array().items(Joi.object().unknown(true)).optional(),
+}).unknown(true);
 
 // Schema for OTP verification
 export const verifyOTPSchema = Joi.object({
@@ -73,7 +81,11 @@ export const verifyOTPSchema = Joi.object({
             "string.pattern.base": "OTP must only contain numbers",
             "any.required": "OTP is required",
         }),
-});
+    guestToken: Joi.string().allow(null, "").optional(),
+    guestId: Joi.string().allow(null, "").optional(),
+    cartItems: Joi.array().items(Joi.object().unknown(true)).optional(),
+    items: Joi.array().items(Joi.object().unknown(true)).optional(),
+}).unknown(true);
 
 // Schema for forgot password request
 export const forgotPasswordSchema = Joi.object({

@@ -4,6 +4,7 @@ import { generateOTP, getOTPExpiry, verifyOTP } from "../utils/otp.util.js";
 import jwt from "jsonwebtoken";
 import admin from "../config/firebase.js";
 import emailService from "./email.service.js";
+import cartService from "./cart.service.js";
 import { OTP_SENT, PASSWORD_RESET_REQUEST } from "../config/strings.js";
 
 class AuthService {
@@ -225,7 +226,7 @@ class AuthService {
      * @param {string} otpCode - OTP code entered by user
      * @returns {Promise<Object>} User object with token
      */
-    async verifyOTP(email, otpCode, role = "user") {
+    async verifyOTP(email, otpCode, role = "user", guestData = null) {
         if (!email) {
             throw new AppError("Email is required", 400);
         }
@@ -276,6 +277,24 @@ class AuthService {
         user.otp.attempts = 0;
 
         await user.save();
+
+        // Migrate guest cart if guestData is provided
+        if (
+            guestData &&
+            (guestData.guestToken ||
+                guestData.guestId ||
+                guestData.items ||
+                guestData.cartItems)
+        ) {
+            try {
+                await cartService.mergeCart(user._id, guestData);
+            } catch (mergeErr) {
+                console.warn(
+                    "[AuthService] Could not auto-migrate guest cart on verifyOTP:",
+                    mergeErr.message
+                );
+            }
+        }
 
         // Generate JWT token after successful verification
         const token = user.generateAuthToken();
@@ -484,7 +503,7 @@ class AuthService {
      * @param {string} idToken - Google ID token from Firebase Auth
      * @returns {Promise<Object>} User object with JWT token
      */
-    async googleSignIn(idToken) {
+    async googleSignIn(idToken, guestData = null) {
         try {
             // Verify the Google ID token
             const decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -529,6 +548,24 @@ class AuthService {
                 });
 
                 await user.save();
+            }
+
+            // Migrate guest cart if guestData is provided
+            if (
+                guestData &&
+                (guestData.guestToken ||
+                    guestData.guestId ||
+                    guestData.items ||
+                    guestData.cartItems)
+            ) {
+                try {
+                    await cartService.mergeCart(user._id, guestData);
+                } catch (mergeErr) {
+                    console.warn(
+                        "[AuthService] Could not auto-migrate guest cart on googleSignIn:",
+                        mergeErr.message
+                    );
+                }
             }
 
             // Generate JWT token
