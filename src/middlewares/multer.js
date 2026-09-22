@@ -79,6 +79,19 @@ const supportedMimeTypes = [
     "application/octet-stream",
 ];
 
+// Set up multer with Cloudinary storage
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 30_000_000 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith("image/") || supportedMimeTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error("Unsupported file type: " + file.originalname), false);
+        }
+    },
+});
+
 // Memory storage upload for Sharp image/document processing
 export const memoryUpload = multer({
     storage: multer.memoryStorage(),
