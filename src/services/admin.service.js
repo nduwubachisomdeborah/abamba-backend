@@ -977,33 +977,56 @@ class AdminService {
         }
 
         // Handle flat commission fields
-        if (updateData.commissionEnabled !== undefined || updateData.commissionPercentage !== undefined || updateData.commissionStartDate !== undefined) {
+        if (
+            updateData.commissionEnabled !== undefined ||
+            updateData.commissionPercentage !== undefined ||
+            updateData.commissionStartDate !== undefined ||
+            updateData.platformFeePercentage !== undefined ||
+            updateData.platformFeeRate !== undefined ||
+            updateData.commissionRate !== undefined
+        ) {
             if (!settings.commission) settings.commission = {};
             if (updateData.commissionEnabled !== undefined) {
                 settings.commission.enabled = Boolean(updateData.commissionEnabled);
             }
             if (updateData.commissionPercentage !== undefined) {
                 settings.commission.percentage = Number(updateData.commissionPercentage);
+            } else if (updateData.platformFeePercentage !== undefined) {
+                settings.commission.percentage = Number(updateData.platformFeePercentage);
+            } else if (updateData.commissionRate !== undefined) {
+                settings.commission.percentage = Number(updateData.commissionRate);
             }
             if (updateData.commissionStartDate !== undefined) {
-                settings.commission.startDate = updateData.commissionStartDate ? new Date(updateData.commissionStartDate) : null;
+                settings.commission.startDate = updateData.commissionStartDate
+                    ? new Date(updateData.commissionStartDate)
+                    : null;
             }
         }
 
-        // Update nested commission object
-        if (updateData.commission) {
-            settings.commission = {
-                ...(settings.commission?.toObject?.() || settings.commission || {}),
-                ...updateData.commission,
-            };
-            if (updateData.commission.enabled !== undefined) {
-                settings.commission.enabled = Boolean(updateData.commission.enabled);
-            }
-            if (updateData.commission.percentage !== undefined) {
-                settings.commission.percentage = Number(updateData.commission.percentage);
-            }
-            if (updateData.commission.startDate !== undefined) {
-                settings.commission.startDate = updateData.commission.startDate ? new Date(updateData.commission.startDate) : null;
+        // Update commission object or direct boolean/number
+        if (updateData.commission !== undefined) {
+            if (typeof updateData.commission === "boolean") {
+                if (!settings.commission) settings.commission = {};
+                settings.commission.enabled = updateData.commission;
+            } else if (typeof updateData.commission === "number") {
+                if (!settings.commission) settings.commission = {};
+                settings.commission.percentage = updateData.commission;
+            } else if (typeof updateData.commission === "object" && updateData.commission !== null) {
+                settings.commission = {
+                    ...(settings.commission?.toObject?.() || settings.commission || {}),
+                    ...updateData.commission,
+                };
+                if (updateData.commission.enabled !== undefined) {
+                    settings.commission.enabled = Boolean(updateData.commission.enabled);
+                }
+                if (updateData.commission.percentage !== undefined) {
+                    settings.commission.percentage = Number(updateData.commission.percentage);
+                }
+                if (updateData.commission.startDate !== undefined) {
+                    settings.commission.startDate = updateData.commission.startDate
+                        ? new Date(updateData.commission.startDate)
+                        : null;
+                }
             }
         }
 

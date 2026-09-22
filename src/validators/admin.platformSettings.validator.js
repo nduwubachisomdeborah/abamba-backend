@@ -23,14 +23,22 @@ export const updatePlatformSettingsSchema = Joi.object({
     requireSpecialCharacters: Joi.boolean().optional(),
     
     // Commission & Growth Promo
-    commission: Joi.object({
-        enabled: Joi.boolean().optional(),
-        percentage: Joi.number().min(0).max(100).optional(),
-        startDate: Joi.date().iso().optional().allow(null),
-    }).optional().unknown(true),
+    commission: Joi.alternatives().try(
+        Joi.object({
+            enabled: Joi.boolean().optional(),
+            percentage: Joi.number().min(0).max(100).optional(),
+            startDate: Joi.date().iso().optional().allow(null, ""),
+        }).unknown(true),
+        Joi.boolean(),
+        Joi.number().min(0).max(100)
+    ).optional(),
     commissionEnabled: Joi.boolean().optional(),
     commissionPercentage: Joi.number().min(0).max(100).optional(),
-    commissionStartDate: Joi.date().iso().optional().allow(null),
+    commissionRate: Joi.number().min(0).max(100).optional(),
+    commissionStartDate: Joi.date().iso().optional().allow(null, ""),
+    platformFeePercentage: Joi.number().min(0).max(100).optional(),
+    platformFeeRate: Joi.number().min(0).max(100).optional(),
+    platformFee: Joi.number().min(0).max(100).optional(),
     
     // Social Media Links
     socialMedia: Joi.object({

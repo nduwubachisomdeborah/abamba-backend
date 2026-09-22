@@ -184,9 +184,18 @@ class AuthService {
         const otpExpiry = getOTPExpiry();
 
         // Update user OTP
-        user.otp.code = otpCode;
-        user.otp.expiresAt = otpExpiry;
-        user.otp.verified = false;
+        if (!user.otp) {
+            user.otp = {
+                code: otpCode,
+                expiresAt: otpExpiry,
+                verified: false,
+                attempts: 0,
+            };
+        } else {
+            user.otp.code = otpCode;
+            user.otp.expiresAt = otpExpiry;
+            user.otp.verified = false;
+        }
 
         user.lastLoginAt = new Date();
 
@@ -240,12 +249,12 @@ class AuthService {
             throw new AppError("User not found", 404);
         }
 
-        if (user.otp.code === null || user.otp.expiresAt === null) {
+        if (!user.otp || !user.otp.code || !user.otp.expiresAt) {
             throw new AppError("Request a new OTP", 400);
         }
 
         // Check if user has exceeded maximum attempts (5)
-        if (user.otp.attempts >= 5) {
+        if ((user.otp.attempts || 0) >= 5) {
             // Reset OTP and throw error
             user.otp.code = null;
             user.otp.expiresAt = null;
@@ -258,7 +267,7 @@ class AuthService {
         }
 
         // Increment attempt counter
-        user.otp.attempts += 1;
+        user.otp.attempts = (user.otp.attempts || 0) + 1;
 
         // Check if OTP is valid
         if (!verifyOTP(otpCode, user.otp.code, user.otp.expiresAt)) {
@@ -332,9 +341,18 @@ class AuthService {
         const otpExpiry = getOTPExpiry();
 
         // Update user OTP
-        user.otp.code = otpCode;
-        user.otp.expiresAt = otpExpiry;
-        user.otp.verified = false;
+        if (!user.otp) {
+            user.otp = {
+                code: otpCode,
+                expiresAt: otpExpiry,
+                verified: false,
+                attempts: 0,
+            };
+        } else {
+            user.otp.code = otpCode;
+            user.otp.expiresAt = otpExpiry;
+            user.otp.verified = false;
+        }
 
         await user.save();
 
@@ -399,10 +417,19 @@ class AuthService {
         const otpExpiry = getOTPExpiry();
 
         // Update user OTP and reset attempts counter
-        user.otp.code = otpCode;
-        user.otp.expiresAt = otpExpiry;
-        user.otp.verified = false;
-        user.otp.attempts = 0;
+        if (!user.otp) {
+            user.otp = {
+                code: otpCode,
+                expiresAt: otpExpiry,
+                verified: false,
+                attempts: 0,
+            };
+        } else {
+            user.otp.code = otpCode;
+            user.otp.expiresAt = otpExpiry;
+            user.otp.verified = false;
+            user.otp.attempts = 0;
+        }
 
         await user.save();
 
@@ -444,12 +471,15 @@ class AuthService {
             "+otp.code +otp.expiresAt +password"
         );
 
-        if (!user) {
-            throw new AppError("User not found", 404);
+        if (!user.otp || !user.otp.code || !user.otp.expiresAt) {
+            throw new AppError(
+                "Invalid or expired password reset request. Please request a new OTP.",
+                400
+            );
         }
 
         // Check if user has exceeded maximum attempts (5)
-        if (user.otp.attempts >= 5) {
+        if ((user.otp.attempts || 0) >= 5) {
             // Reset OTP and throw error
             user.otp.code = null;
             user.otp.expiresAt = null;
@@ -462,7 +492,7 @@ class AuthService {
         }
 
         // Increment attempt counter
-        user.otp.attempts += 1;
+        user.otp.attempts = (user.otp.attempts || 0) + 1;
 
         // Check if OTP is valid
         if (!verifyOTP(otpCode, user.otp.code, user.otp.expiresAt)) {

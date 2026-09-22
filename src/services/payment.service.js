@@ -504,13 +504,18 @@ class PaymentService {
 
         // Fetch dynamic platform settings for commission calculation
         const platformSettings = await PlatformSettings.getInstance();
+        const commissionConfig = platformSettings?.commission;
+        const isExplicitlyEnabled = commissionConfig?.enabled === true;
+        const isPastStartDate = Boolean(
+            commissionConfig?.startDate &&
+            new Date() >= new Date(commissionConfig.startDate)
+        );
+        // Active if explicitly enabled by admin toggle OR if start date has arrived without being disabled
         const isCommissionActive = Boolean(
-            platformSettings?.commission?.enabled &&
-            (!platformSettings?.commission?.startDate ||
-                new Date() >= new Date(platformSettings.commission.startDate))
+            isExplicitlyEnabled || (commissionConfig?.enabled !== false && isPastStartDate)
         );
         const feePercentage = isCommissionActive
-            ? Number(platformSettings?.commission?.percentage ?? 1.5)
+            ? Number(commissionConfig?.percentage ?? 1.5)
             : 0;
         const feeRate = feePercentage / 100;
 

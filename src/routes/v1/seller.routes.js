@@ -6,6 +6,8 @@ import {
     optionalAuth,
 } from "../../middlewares/auth.js";
 import SellerController from "../../controllers/seller.contoller.js";
+import OrderController from "../../controllers/order.controller.js";
+import CustomerController from "../../controllers/customer.controller.js";
 import { loginUserSchema } from "../../validators/user.validator.js";
 import { payoutRequestSchema } from "../../validators/user.validator.js";
 import validate from "../../middlewares/validate.js";
@@ -114,6 +116,27 @@ router.patch(
     restrictTo("seller"),
     validate(sellerUpdateNotificationSettingsSchema),
     SellerController.updateNotificationSettings,
+);
+
+// Seller Order routes
+router.get("/orders", authenticate, OrderController.getOrders);
+router.get("/orders/:id", authenticate, OrderController.getOrderById);
+router.patch("/orders/:id/status", authenticate, OrderController.updateOrderStatus);
+
+// Seller Customer routes
+router.get("/customers", authenticate, restrictTo("seller"), CustomerController.getCustomers);
+router.get("/customers/metrics/overview", authenticate, restrictTo("seller"), CustomerController.getCustomerMetrics);
+router.get("/customers/metrics/recent", authenticate, restrictTo("seller"), CustomerController.getRecentCustomers);
+router.get("/customers/metrics/top", authenticate, restrictTo("seller"), CustomerController.getTopCustomers);
+router.get("/customers/:customerId", authenticate, restrictTo("seller"), CustomerController.getCustomerById);
+router.get("/customers/:customerId/orders", authenticate, restrictTo("seller"), CustomerController.getCustomerOrders);
+
+// Seller Wallet alias
+router.get(
+    "/wallet",
+    authenticate,
+    restrictTo("seller"),
+    SellerController.getUserTransactions,
 );
 
 // Get seller by ID with optional authentication for follow status

@@ -24,6 +24,14 @@ class SellerService {
         return await User.findById(id);
     };
 
+    getUserById = async (id) => {
+        return await User.findById(id).select("+business +bank");
+    };
+
+    getSellerById = async (id) => {
+        return await User.findById(id).select("+business +bank");
+    };
+
     updateProfilePicture = async (userId, profilePicture) => {
         const seller = await User.findOne({
             _id: userId,

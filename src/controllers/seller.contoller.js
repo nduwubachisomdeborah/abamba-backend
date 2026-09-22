@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import sellerService from "../services/seller.service.js";
 import followerService from "../services/follower.service.js";
 import transactionService from "../services/transaction.service.js";
@@ -244,7 +245,15 @@ class SellerController {
     });
 
     static getSellerById = asyncHandler(async (req, res) => {
+        if (!mongoose.Types.ObjectId.isValid(req.params.sellerId)) {
+            return errorResponse(res, "Seller not found", 404);
+        }
+
         const seller = await sellerService.getUserById(req.params.sellerId);
+        if (!seller) {
+            return errorResponse(res, "Seller not found", 404);
+        }
+
         const storeStats = await sellerService.getStoreStats(
             req.params.sellerId,
         );
