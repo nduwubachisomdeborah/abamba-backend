@@ -502,8 +502,7 @@ class PaymentService {
                     3000,
             );
 
-        // Fetch dynamic platform settings for commission calculation
-        const platformSettings = await PlatformSettings.getInstance();
+        // Evaluate dynamic platform settings for commission calculation
         const commissionConfig = platformSettings?.commission;
         const isExplicitlyEnabled = commissionConfig?.enabled === true;
         const isPastStartDate = Boolean(
