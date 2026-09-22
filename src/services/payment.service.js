@@ -502,9 +502,18 @@ class PaymentService {
                     3000,
             );
 
-        // Create orders first
-        const platformFeePercentage =
-            parseFloat(process.env.PLATFORM_FEE_PERCENTAGE) || 0.5;
+        // Fetch dynamic platform settings for commission calculation
+        const platformSettings = await PlatformSettings.getInstance();
+        const isCommissionActive = Boolean(
+            platformSettings?.commission?.enabled &&
+            (!platformSettings?.commission?.startDate ||
+                new Date() >= new Date(platformSettings.commission.startDate))
+        );
+        const feePercentage = isCommissionActive
+            ? Number(platformSettings?.commission?.percentage ?? 1.5)
+            : 0;
+        const feeRate = feePercentage / 100;
+
         const savedOrders = [];
         for (const [sellerId, items] of groups.entries()) {
             const subtotal = items.reduce(
@@ -516,11 +525,15 @@ class PaymentService {
             const orderShipping = isPickupStation
                 ? 0
                 : (Number((shippingCost * share).toFixed(2)) || deliveryFee);
-            // Calculate platform fee from seller order subtotal
+            // Calculate platform fee and seller earnings from seller order subtotal
             const platformFee = Number(
-                (subtotal * (platformFeePercentage / 100)).toFixed(2),
+                (subtotal * feeRate).toFixed(2),
             );
-            const total = subtotal + orderShipping + platformFee;
+            const platformFeeRate = feePercentage;
+            const sellerEarnings = Number(
+                (subtotal - platformFee).toFixed(2),
+            );
+            const total = subtotal + orderShipping;
 
             const order = new Order({
                 user: userId,
@@ -563,6 +576,8 @@ class PaymentService {
                 subtotal,
                 shippingCost: orderShipping,
                 platformFee,
+                platformFeeRate,
+                sellerEarnings,
                 total,
                 notes,
                 status: "pending",
@@ -874,10 +889,14 @@ class PaymentService {
             }
         }
 
-        // Credit seller wallets (subtotal only) and notify them
+        // Credit seller wallets (sellerEarnings) and notify them
         for (const order of orders) {
             const sellerId = order.seller?._id || order.seller;
-            const creditAmount = Number(order.subtotal || 0);
+            const creditAmount = Number(
+                order.sellerEarnings !== undefined && order.sellerEarnings !== null
+                    ? order.sellerEarnings
+                    : Math.max(0, Number(order.subtotal || 0) - Number(order.platformFee || 0))
+            );
             if (!sellerId || creditAmount <= 0) continue;
 
             await User.findByIdAndUpdate(sellerId, {
@@ -889,7 +908,7 @@ class PaymentService {
             await notificationService.send(
                 sellerId,
                 "Order payment received",
-                `Your wallet has been credited with **₦${creditAmount}** (Pending) for order **#${
+                `Your wallet has been credited with **₦${creditAmount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}** (Pending) for order **#${
                     order.orderId || order._id
                 }**. Funds will be available for withdrawal after delivery.`,
             );

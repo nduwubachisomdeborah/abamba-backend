@@ -325,7 +325,11 @@ class OrderService {
 
         // If order is delivered, release funds from pending to available seller wallet balance
         if (status === "delivered" && order.sellerWalletStatus === "pending") {
-            const creditAmount = Number(order.subtotal || 0);
+            const creditAmount = Number(
+                order.sellerEarnings !== undefined && order.sellerEarnings !== null
+                    ? order.sellerEarnings
+                    : Math.max(0, Number(order.subtotal || 0) - Number(order.platformFee || 0))
+            );
             if (order.seller && creditAmount > 0) {
                 const sellerUser = await User.findById(order.seller);
                 if (sellerUser) {
@@ -344,7 +348,7 @@ class OrderService {
                 await notificationService.send(
                     order.seller,
                     "Funds Released",
-                    `Order #${order.orderId || order._id} has been delivered. **₦${creditAmount.toLocaleString()}** is now available for withdrawal.`,
+                    `Order #${order.orderId || order._id} has been delivered. **₦${creditAmount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}** is now available for withdrawal.`,
                 );
             }
         }

@@ -103,6 +103,24 @@ const platformSettingsSchema = new mongoose.Schema(
             default: true,
         },
 
+        // Seller Commission & Growth Promotion Configuration
+        commission: {
+            enabled: {
+                type: Boolean,
+                default: false, // 0% charge during growth promo
+            },
+            percentage: {
+                type: Number,
+                default: 1.5, // 1.5% fee
+                min: 0,
+                max: 100,
+            },
+            startDate: {
+                type: Date,
+                default: () => new Date("2027-01-01T00:00:00.000Z"),
+            },
+        },
+
         // Security & Configurations
         security: {
             passwordPolicy: {
@@ -300,6 +318,11 @@ platformSettingsSchema.statics.getInstance = async function () {
             adminEmail: "abambanigeria@gmail.com",
             supportEmail: "Abambasupport@gmail.com",
             systemPreferences: { bonusWeekEnabled: true },
+            commission: {
+                enabled: false,
+                percentage: 1.5,
+                startDate: new Date("2027-01-01T00:00:00.000Z"),
+            },
         });
     }
     return settings;

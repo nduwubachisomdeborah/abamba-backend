@@ -210,6 +210,14 @@ const orderSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+        platformFeeRate: {
+            type: Number,
+            default: 0,
+        },
+        sellerEarnings: {
+            type: Number,
+            default: 0,
+        },
         total: {
             type: Number,
             required: true,
@@ -325,19 +333,19 @@ orderSchema.virtual("formattedTotal").get(function () {
     })}`;
 });
 
-// Virtual for seller earnings (seller receives subtotal; shipping goes to logistics and platformFee to platform)
-orderSchema.virtual("sellerEarnings").get(function () {
-    return Number((this.subtotal || 0).toFixed(2));
-});
-
+// Virtual for formatted seller earnings
 orderSchema.virtual("formattedSellerEarnings").get(function () {
-    return `₦${Number(this.subtotal || 0).toLocaleString("en-NG", {
+    const earnings =
+        this.sellerEarnings !== undefined && this.sellerEarnings !== null
+            ? this.sellerEarnings
+            : Math.max(0, Number(this.subtotal || 0) - Number(this.platformFee || 0));
+    return `₦${Number(earnings || 0).toLocaleString("en-NG", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     })}`;
 });
 
-// Ensure orderId is set before saving
+// Ensure orderId and sellerEarnings are set before saving
 orderSchema.pre("save", async function (next) {
     if (!this.orderId) {
         try {
@@ -345,6 +353,12 @@ orderSchema.pre("save", async function (next) {
         } catch (error) {
             return next(error);
         }
+    }
+    if (this.sellerEarnings === undefined || this.sellerEarnings === null) {
+        this.sellerEarnings = Math.max(
+            0,
+            Number((Number(this.subtotal || 0) - Number(this.platformFee || 0)).toFixed(2))
+        );
     }
     next();
 });

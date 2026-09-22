@@ -335,7 +335,11 @@ class WebhookController {
 
                 // Release funds if still pending
                 if (order.sellerWalletStatus === "pending") {
-                    const creditAmount = Number(order.subtotal || 0);
+                    const creditAmount = Number(
+                        order.sellerEarnings !== undefined && order.sellerEarnings !== null
+                            ? order.sellerEarnings
+                            : Math.max(0, Number(order.subtotal || 0) - Number(order.platformFee || 0))
+                    );
                     if (order.seller && creditAmount > 0) {
                         // Move from pending to balance
                         const sellerUser = await User.findById(order.seller);
@@ -358,7 +362,7 @@ class WebhookController {
                         await notificationService.send(
                             order.seller,
                             "Funds Released",
-                            `Order #${order.orderId} has been delivered. **₦${creditAmount}** is now available for withdrawal.`,
+                            `Order #${order.orderId} has been delivered. **₦${creditAmount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}** is now available for withdrawal.`,
                         );
                         console.log(
                             `[ShipBubble Webhook] Released funds for order: ${order.orderId}`,

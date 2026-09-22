@@ -976,6 +976,37 @@ class AdminService {
             }
         }
 
+        // Handle flat commission fields
+        if (updateData.commissionEnabled !== undefined || updateData.commissionPercentage !== undefined || updateData.commissionStartDate !== undefined) {
+            if (!settings.commission) settings.commission = {};
+            if (updateData.commissionEnabled !== undefined) {
+                settings.commission.enabled = Boolean(updateData.commissionEnabled);
+            }
+            if (updateData.commissionPercentage !== undefined) {
+                settings.commission.percentage = Number(updateData.commissionPercentage);
+            }
+            if (updateData.commissionStartDate !== undefined) {
+                settings.commission.startDate = updateData.commissionStartDate ? new Date(updateData.commissionStartDate) : null;
+            }
+        }
+
+        // Update nested commission object
+        if (updateData.commission) {
+            settings.commission = {
+                ...(settings.commission?.toObject?.() || settings.commission || {}),
+                ...updateData.commission,
+            };
+            if (updateData.commission.enabled !== undefined) {
+                settings.commission.enabled = Boolean(updateData.commission.enabled);
+            }
+            if (updateData.commission.percentage !== undefined) {
+                settings.commission.percentage = Number(updateData.commission.percentage);
+            }
+            if (updateData.commission.startDate !== undefined) {
+                settings.commission.startDate = updateData.commission.startDate ? new Date(updateData.commission.startDate) : null;
+            }
+        }
+
         // Update nested objects (merge with existing values)
         if (updateData.socialMedia) {
             settings.socialMedia = {
