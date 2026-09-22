@@ -6,11 +6,13 @@ class PaginationUtil {
    * Create pagination options for mongoose queries
    * @param {Object} query - Express request query object
    * @param {number} defaultLimit - Default page size
+   * @param {number} maxLimit - Hard upper ceiling for page size to prevent heap exhaustion
    * @returns {Object} Pagination options
    */
-  static getPaginationOptions(query, defaultLimit = 10) {
+  static getPaginationOptions(query, defaultLimit = 10, maxLimit = 100) {
     const page = Math.max(1, parseInt(query.page) || 1);
-    const limit = Math.max(1, parseInt(query.limit) || defaultLimit);
+    const parsedLimit = parseInt(query.limit) || defaultLimit;
+    const limit = Math.min(maxLimit, Math.max(1, parsedLimit));
     const skip = (page - 1) * limit;
     
     return {

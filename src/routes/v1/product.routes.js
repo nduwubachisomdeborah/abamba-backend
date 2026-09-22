@@ -50,6 +50,14 @@ router.get(
     optionalAuth(authenticate),
     ProductController.getFeaturedProducts
 );
+// Admin only routes
+router.get(
+    "/stats",
+    authenticate,
+    restrictTo("admin"),
+    ProductController.getProductStats
+);
+
 router.get("/", optionalAuth(authenticate), ProductController.getProducts);
 router.get(
     "/:id",
@@ -63,14 +71,6 @@ router.get("/:productId/variants/:variantId", ProductController.getVariantById);
 
 // Public review routes
 router.get("/:productId/reviews", ReviewController.getProductReviews);
-
-// Admin only routes
-router.get(
-    "/stats",
-    authenticate,
-    restrictTo("admin"),
-    ProductController.getProductStats
-);
 
 router.put(
     "/category-options/:category",

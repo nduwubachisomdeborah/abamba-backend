@@ -12,6 +12,13 @@ import { fileURLToPath } from "url";
 import rateLimit from "express-rate-limit";
 import compression from "compression";
 
+// Force high-performance public DNS resolvers to prevent SRV lookup timeouts on Windows / ISP networks
+try {
+    dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
+} catch (e) {
+    // ignore if system restricts custom DNS
+}
+
 // Import versioned routes
 import v1Routes from "./routes/v1/index.js";
 import v2Routes from "./routes/v2/index.js";
@@ -85,6 +92,7 @@ const limiter = rateLimit({
     skip: (req) =>
         req.path === "/health" ||
         req.path === "/" ||
+        req.path.includes("webhook") ||
         req.path.startsWith("/api/v1/webhooks"),
     message: {
         success: false,

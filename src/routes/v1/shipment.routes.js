@@ -20,8 +20,11 @@ router.post(
     "/carriers",
     optionalAuth(authenticate),
     validateGetCarriers,
-    ShipmentController.getCarriers,
+    ShipmentController.getCarriers
 );
+
+// Unauthenticated webhook endpoint for carrier status callbacks
+router.post("/webhook/shipment", ShipmentController.webhookShipment);
 
 // Protect all other shipment routes
 router.use(authenticate);
@@ -50,7 +53,5 @@ router.patch(
     ShipmentController.updateShipment,
 );
 router.delete("/:id", adminOnly, ShipmentController.deleteShipment);
-
-router.post("/webhook/shipment", ShipmentController.webhookShipment);
 
 export default router;

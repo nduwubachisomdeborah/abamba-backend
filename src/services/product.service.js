@@ -432,18 +432,18 @@ class ProductService {
         // Exclude dummy products in categories that have real seller products
         const finalFilter = await this._buildCategoryDummyFilter(filter);
 
-        // Count total matching documents
-        const total = await Product.countDocuments(finalFilter);
-
-        // Get products with pagination, filtering, and sorting
-        const products = await Product.find(finalFilter)
-            .sort(sort)
-            .skip(skip)
-            .limit(limit)
-            .populate({
-                path: "user",
-                select: "name email +business",
-            });
+        // Execute count and product query in parallel to cut database response time in half
+        const [total, products] = await Promise.all([
+            Product.countDocuments(finalFilter),
+            Product.find(finalFilter)
+                .sort(sort)
+                .skip(skip)
+                .limit(limit)
+                .populate({
+                    path: "user",
+                    select: "name email +business",
+                }),
+        ]);
 
         // Generate pagination metadata
         const pagination = PaginationUtil.getPaginationData(total, page, limit);

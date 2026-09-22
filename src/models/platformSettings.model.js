@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import cache from "../utils/cache.util.js";
 
 const platformSettingsSchema = new mongoose.Schema(
     {
@@ -307,25 +308,36 @@ platformSettingsSchema.pre("save", function (next) {
         if (!this.systemPreferences) this.systemPreferences = {};
         this.systemPreferences.bonusWeekEnabled = this.isBonusEventActive;
     }
+    cache.del("platform_settings_singleton");
     next();
 });
 
-// Ensure only one platform settings document exists
+platformSettingsSchema.post("findOneAndUpdate", function () {
+    cache.del("platform_settings_singleton");
+});
+
+// Ensure only one platform settings document exists with in-memory caching
 platformSettingsSchema.statics.getInstance = async function () {
-    let settings = await this.findOne();
-    if (!settings) {
-        settings = await this.create({
-            adminEmail: "abambanigeria@gmail.com",
-            supportEmail: "Abambasupport@gmail.com",
-            systemPreferences: { bonusWeekEnabled: true },
-            commission: {
-                enabled: false,
-                percentage: 1.5,
-                startDate: new Date("2027-01-01T00:00:00.000Z"),
-            },
-        });
-    }
-    return settings;
+    return cache.wrap(
+        "platform_settings_singleton",
+        async () => {
+            let settings = await this.findOne();
+            if (!settings) {
+                settings = await this.create({
+                    adminEmail: "abambanigeria@gmail.com",
+                    supportEmail: "Abambasupport@gmail.com",
+                    systemPreferences: { bonusWeekEnabled: true },
+                    commission: {
+                        enabled: false,
+                        percentage: 1.5,
+                        startDate: new Date("2027-01-01T00:00:00.000Z"),
+                    },
+                });
+            }
+            return settings;
+        },
+        120
+    );
 };
 
 const PlatformSettings = mongoose.model(

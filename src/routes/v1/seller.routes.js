@@ -139,6 +139,23 @@ router.get(
     SellerController.getUserTransactions,
 );
 
+// Following & Payout routes (must precede /:sellerId to prevent parameter shadowing)
+router.get("/following", authenticate, SellerController.getFollowing);
+
+router.post(
+    ["/payout", "/payouts"],
+    authenticate,
+    restrictTo("seller"),
+    validate(payoutRequestSchema),
+    SellerController.requestPayout,
+);
+router.get(
+    "/payouts",
+    authenticate,
+    restrictTo("seller"),
+    SellerController.getAllPayouts,
+);
+
 // Get seller by ID with optional authentication for follow status
 router.get(
     "/:sellerId",
@@ -156,21 +173,5 @@ router.delete(
 
 // Get followers and following lists
 router.get("/:sellerId/followers", SellerController.getSellerFollowers);
-router.get("/following", authenticate, SellerController.getFollowing);
-
-// Payout routes
-router.post(
-    ["/payout", "/payouts"],
-    authenticate,
-    restrictTo("seller"),
-    validate(payoutRequestSchema),
-    SellerController.requestPayout,
-);
-router.get(
-    "/payouts",
-    authenticate,
-    restrictTo("seller"),
-    SellerController.getAllPayouts,
-);
 
 export default router;

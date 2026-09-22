@@ -39,8 +39,13 @@ router.patch(
 // Address routes
 router.use("/addresses", addressRoutes);
 
-// Admin only routes
-router.get("/", restrictTo("admin"), UserController.getUsers);
+// Dynamic root route: returns full user list for Admins, or current user profile for regular users
+router.get("/", (req, res, next) => {
+    if (req.user?.role === "admin") {
+        return UserController.getUsers(req, res, next);
+    }
+    return UserController.getMe(req, res, next);
+});
 router.get("/:id", restrictTo("admin"), UserController.getUserById);
 router.patch("/:id/enable", restrictTo("admin"), UserController.enableAccount);
 

@@ -15,6 +15,7 @@ router.use(authenticate);
 router.use(restrictTo("seller"));
 
 // Product routes
+router.get("/stats", SellerProductController.getSellerProductStats);
 router.get("/", SellerProductController.getSellerProducts);
 router.post(
     "/",
@@ -66,8 +67,5 @@ router.delete(
     "/:productId/variants/:variantId/promotion",
     SellerProductController.removeVariantPromotion
 );
-
-// Product stats
-router.get("/stats", SellerProductController.getSellerProductStats);
 
 export default router;
