@@ -174,14 +174,17 @@ class UserController {
      * @access  Private
      */
     static getMe = asyncHandler(async (req, res) => {
-        // req.user is set by the auth middleware
-        const user = await userService.getUserById(req.user.id);
+        // req.user is set by the auth middleware (supports both buyer and seller tokens)
+        const userId = (req.user?.id || req.user?._id || req.decodedToken?.id)?.toString();
+        const user = await userService.getUserById(userId);
 
-        return successResponse(
-            res,
-            "User profile retrieved successfully",
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            message: "User profile retrieved successfully",
             user,
-        );
+            data: user,
+        });
     });
 
     /**

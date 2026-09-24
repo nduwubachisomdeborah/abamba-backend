@@ -72,7 +72,7 @@ class UploadController {
             console.warn("MinIO storage note:", minioErr.message);
         }
 
-        const baseUrl = process.env.MINIO_PUBLIC_URL || process.env.APP_URL || "";
+        const baseUrl = process.env.MINIO_PUBLIC_URL || process.env.BASE_URL || process.env.APP_URL || "http://localhost:5500";
         const fileUrl = baseUrl
             ? `${baseUrl.replace(/\/+$/, "")}/${documentKey}`
             : `/uploads/${documentKey}`;
@@ -125,7 +125,7 @@ class UploadController {
             console.warn("MinIO storage note:", minioErr.message);
         }
 
-        const baseUrl = process.env.MINIO_PUBLIC_URL || process.env.APP_URL || "";
+        const baseUrl = process.env.MINIO_PUBLIC_URL || process.env.BASE_URL || process.env.APP_URL || "http://localhost:5500";
         const thumbUrl = baseUrl ? `${baseUrl.replace(/\/+$/, "")}/${thumbKey}` : `/uploads/${thumbKey}`;
         const medUrl = baseUrl ? `${baseUrl.replace(/\/+$/, "")}/${medKey}` : `/uploads/${medKey}`;
         const fullUrl = baseUrl ? `${baseUrl.replace(/\/+$/, "")}/${fullKey}` : `/uploads/${fullKey}`;

@@ -92,6 +92,12 @@ const extractAndVerifyToken = asyncHandler(async (req, res, next) => {
             return next(error);
         }
 
+        if (error.name === "TokenExpiredError") {
+            return next(
+                new AppError("Token has expired. Please log in again", 401)
+            );
+        }
+
         return next(new AppError("Invalid token. Please log in again", 401));
     }
 });
@@ -171,14 +177,19 @@ export const verifiedSellerOnly = asyncHandler(async (req, res, next) => {
 });
 
 /**
- * Admin middleware - requires a user with admin role
+ * Admin middleware - requires a user with admin or superAdmin role
  * For use on admin-only routes
  */
 export const adminOnly = asyncHandler(async (req, res, next) => {
     // First authenticate the user
     authenticate(req, res, () => {
-        // Then check if the user is an admin
-        if (req.user.role !== "admin") {
+        const isAdmin =
+            req.user?.role === "admin" ||
+            req.user?.role === "superAdmin" ||
+            req.user?.roles?.includes("admin") ||
+            req.user?.roles?.includes("superAdmin");
+
+        if (!isAdmin) {
             return next(
                 new AppError("This route is restricted to administrators", 403)
             );

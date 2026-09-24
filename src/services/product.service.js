@@ -200,6 +200,107 @@ class ProductService {
     }
 
     /**
+     * Normalize an image URL:
+     * - Injects Cloudinary on-the-fly optimization flags (f_auto,q_auto,w_800,c_limit) if raw Cloudinary URL
+     * - Prepends backend BASE_URL to local relative upload paths (e.g. /uploads/...)
+     */
+    _normalizeUrl(url) {
+        if (!url || typeof url !== "string") return url;
+        let trimmed = url.trim();
+        if (!trimmed) return trimmed;
+
+        // 1. Cloudinary optimization (f_auto,q_auto,w_800,c_limit)
+        if (trimmed.includes("res.cloudinary.com") && trimmed.includes("/image/upload/")) {
+            if (
+                !/\/image\/upload\/(?:[a-z]_[^/]+,?)+\//.test(trimmed) &&
+                !trimmed.includes("/f_auto") &&
+                !trimmed.includes("/q_auto") &&
+                !trimmed.includes("/w_")
+            ) {
+                trimmed = trimmed.replace("/image/upload/", "/image/upload/f_auto,q_auto,w_800,c_limit/");
+            }
+        }
+
+        // 2. Relative upload path resolution
+        if (trimmed.startsWith("/uploads/") || trimmed.startsWith("uploads/")) {
+            const base = (process.env.BASE_URL || process.env.APP_URL || "http://localhost:5500").replace(/\/+$/, "");
+            const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+            return `${base}${cleanPath}`;
+        }
+
+        return trimmed;
+    }
+
+    /**
+     * Process all image references in a product object to ensure they are optimized and accessible
+     */
+    _normalizeProductImageUrls(productObj) {
+        if (!productObj || typeof productObj !== "object") return productObj;
+
+        if (productObj.thumbnail) {
+            productObj.thumbnail = this._normalizeUrl(productObj.thumbnail);
+        }
+        if (productObj.image) {
+            productObj.image = this._normalizeUrl(productObj.image);
+        }
+        if (productObj.primaryImage) {
+            productObj.primaryImage = this._normalizeUrl(productObj.primaryImage);
+        }
+        if (productObj.selectedImage) {
+            productObj.selectedImage = this._normalizeUrl(productObj.selectedImage);
+        }
+
+        // Normalize images array
+        if (Array.isArray(productObj.images)) {
+            productObj.images = productObj.images.map((img) => {
+                if (typeof img === "string") {
+                    return this._normalizeUrl(img);
+                }
+                if (img && typeof img === "object") {
+                    const copy = { ...img };
+                    if (copy.url) copy.url = this._normalizeUrl(copy.url);
+                    if (copy.thumbnail) copy.thumbnail = this._normalizeUrl(copy.thumbnail);
+                    if (copy.medium) copy.medium = this._normalizeUrl(copy.medium);
+                    return copy;
+                }
+                return img;
+            });
+        }
+
+        // Fallbacks for thumbnail / image
+        if (!productObj.thumbnail && Array.isArray(productObj.images) && productObj.images.length > 0) {
+            const first = productObj.images[0];
+            productObj.thumbnail = typeof first === "string" ? first : (first?.thumbnail || first?.url);
+        }
+        if (!productObj.image && productObj.thumbnail) {
+            productObj.image = productObj.thumbnail;
+        }
+
+        // Normalize variant images
+        if (Array.isArray(productObj.variants)) {
+            productObj.variants = productObj.variants.map((variant) => {
+                if (!variant || typeof variant !== "object") return variant;
+                if (Array.isArray(variant.images)) {
+                    variant.images = variant.images.map((img) => {
+                        if (typeof img === "string") return this._normalizeUrl(img);
+                        if (img && typeof img === "object") {
+                            const copy = { ...img };
+                            if (copy.url) copy.url = this._normalizeUrl(copy.url);
+                            if (copy.thumbnail) copy.thumbnail = this._normalizeUrl(copy.thumbnail);
+                            if (copy.medium) copy.medium = this._normalizeUrl(copy.medium);
+                            return copy;
+                        }
+                        return img;
+                    });
+                }
+                return variant;
+            });
+        }
+
+        return productObj;
+    }
+
+    /**
      * Get all products with pagination and filtering
      * @param {Object} query - Query parameters for filtering
      * @returns {Promise<Object>} Products and pagination data
@@ -432,17 +533,26 @@ class ProductService {
         // Exclude dummy products in categories that have real seller products
         const finalFilter = await this._buildCategoryDummyFilter(filter);
 
+        let productQuery = Product.find(finalFilter)
+            .sort(sort)
+            .skip(skip)
+            .limit(limit)
+            .populate({
+                path: "user",
+                select: "name email +business",
+            });
+
+        if (query.minimal === "true") {
+            productQuery = productQuery.select("name basePrice promoPrice bonusPrice onSale images thumbnail image category brand rating numReviews variants inStock user slug createdAt");
+        } else if (query.fields && typeof query.fields === "string") {
+            const fieldList = query.fields.split(",").map((f) => f.trim()).join(" ");
+            productQuery = productQuery.select(fieldList);
+        }
+
         // Execute count and product query in parallel to cut database response time in half
         const [total, products] = await Promise.all([
             Product.countDocuments(finalFilter),
-            Product.find(finalFilter)
-                .sort(sort)
-                .skip(skip)
-                .limit(limit)
-                .populate({
-                    path: "user",
-                    select: "name email +business",
-                }),
+            productQuery,
         ]);
 
         // Generate pagination metadata
@@ -471,6 +581,9 @@ class ProductService {
 
                 // Attach pricing, promotions, and bonus slashed pricing
                 productObj = processPromoInfo(productObj, isBonusActive);
+
+                // Normalize image URLs and Cloudinary transforms
+                productObj = this._normalizeProductImageUrls(productObj);
 
                 return productObj;
             });
@@ -554,6 +667,9 @@ class ProductService {
 
         // Attach pricing, promotions, and bonus slashed pricing
         productObj = processPromoInfo(productObj, isBonusActive);
+
+        // Normalize image URLs and Cloudinary transforms
+        productObj = this._normalizeProductImageUrls(productObj);
 
         // Include detailed rating statistics if requested
         if (includeRatingStats) {
@@ -726,6 +842,9 @@ class ProductService {
 
                 // Attach pricing, promotions, and bonus slashed pricing
                 productObj = processPromoInfo(productObj, isBonusActive);
+
+                // Normalize image URLs and Cloudinary transforms
+                productObj = this._normalizeProductImageUrls(productObj);
 
                 return productObj;
             });
@@ -1178,10 +1297,16 @@ class ProductService {
                 select: "name email",
             });
 
+        // Normalize image URLs
+        const processedProducts = products.map((p) => {
+            const pObj = typeof p.toObject === "function" ? p.toObject() : { ...p };
+            return this._normalizeProductImageUrls(pObj);
+        });
+
         // Generate pagination metadata
         const pagination = PaginationUtil.getPaginationData(total, page, limit);
 
-        return { products, pagination };
+        return { products: processedProducts, pagination };
     }
 
     /**
@@ -1221,10 +1346,16 @@ class ProductService {
                 },
             ]);
 
+        // Normalize image URLs
+        const processedProducts = products.map((p) => {
+            const pObj = typeof p.toObject === "function" ? p.toObject() : { ...p };
+            return this._normalizeProductImageUrls(pObj);
+        });
+
         // Generate pagination metadata
         const pagination = PaginationUtil.getPaginationData(total, page, limit);
 
-        return { products, pagination };
+        return { products: processedProducts, pagination };
     }
 
     /**

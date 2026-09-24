@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import { AppError } from "../middlewares/error.js";
 import adminPermissionService from "./adminPermission.service.js";
@@ -7,6 +8,7 @@ import Product from "../models/product.model.js";
 import PlatformSettings from "../models/platformSettings.model.js";
 import notificationService from "./notification.service.js";
 import paymentService from "./payment.service.js";
+import userCache from "../utils/userCache.js";
 
 class AdminService {
     async login(email, password) {
@@ -380,8 +382,7 @@ class AdminService {
         const query = { deleted: { $ne: true } };
 
         if (search) {
-            query.$or = [
-                { orderId: { $regex: search, $options: "i" } },
+            const searchOr = [
                 { status: { $regex: search, $options: "i" } },
                 {
                     "shippingAddress.fullName": {
@@ -389,7 +390,23 @@ class AdminService {
                         $options: "i",
                     },
                 },
+                {
+                    "shippingAddress.phoneNumber": {
+                        $regex: search,
+                        $options: "i",
+                    },
+                },
             ];
+
+            const num = Number(search);
+            if (!isNaN(num)) {
+                searchOr.push({ orderId: num });
+            }
+            if (mongoose.Types.ObjectId.isValid(search)) {
+                searchOr.push({ _id: new mongoose.Types.ObjectId(search) });
+            }
+
+            query.$or = searchOr;
         }
 
         // Only filter by status if a specific status other than 'all' is passed
@@ -632,8 +649,7 @@ class AdminService {
         const query = { seller: sellerId, deleted: { $ne: true } };
 
         if (search) {
-            query.$or = [
-                { orderId: { $regex: search, $options: "i" } },
+            const searchOr = [
                 { status: { $regex: search, $options: "i" } },
                 {
                     "shippingAddress.fullName": {
@@ -641,7 +657,23 @@ class AdminService {
                         $options: "i",
                     },
                 },
+                {
+                    "shippingAddress.phoneNumber": {
+                        $regex: search,
+                        $options: "i",
+                    },
+                },
             ];
+
+            const num = Number(search);
+            if (!isNaN(num)) {
+                searchOr.push({ orderId: num });
+            }
+            if (mongoose.Types.ObjectId.isValid(search)) {
+                searchOr.push({ _id: new mongoose.Types.ObjectId(search) });
+            }
+
+            query.$or = searchOr;
         }
 
         const sortOptions = { [sortBy]: sortOrder === "desc" ? -1 : 1 };
@@ -756,7 +788,17 @@ class AdminService {
     async updateSellerApproval(sellerId, { approved, message = "" }) {
         const seller = await User.findById(sellerId).select("+business");
 
-        if (!seller || seller.role !== "seller") {
+        if (!seller) {
+            throw new AppError("Seller not found", 404);
+        }
+
+        // Accept multi-role sellers: role may be "user" but they have a business record
+        const isSeller =
+            seller.role === "seller" ||
+            (Array.isArray(seller.roles) && seller.roles.includes("seller")) ||
+            Boolean(seller.business?.businessName);
+
+        if (!isSeller) {
             throw new AppError("Seller not found", 404);
         }
 
@@ -767,10 +809,13 @@ class AdminService {
             );
         }
 
-        seller.business.approved = approved;
-        seller.business.message = approved ? "" : message;
+        seller.business.approved = Boolean(approved);
+        seller.business.message = approved ? "" : (message || "");
 
         await seller.save();
+
+        // Invalidate cached seller so getSellerProfile gets fresh approved status immediately
+        userCache.del(sellerId.toString());
 
         // Notify seller of approval/rejection
         const title = approved
@@ -783,6 +828,7 @@ class AdminService {
 
         const sellerObj = seller.toObject();
         delete sellerObj.password;
+        if (sellerObj.otp) delete sellerObj.otp.code;
 
         return sellerObj;
     }

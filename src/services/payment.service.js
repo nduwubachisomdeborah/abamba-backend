@@ -1043,11 +1043,16 @@ class PaymentService {
                 .limit(20);
 
             for (const ord of pendingOrders) {
+                const ordRef = ord.payment?.reference || ord.payment?.transactionId;
+                const paymentConditions = [
+                    { "metadata.orderId": ord._id.toString() },
+                ];
+                if (ordRef) {
+                    paymentConditions.push({ reference: ordRef });
+                }
+
                 const ordPayment = await Payment.findOne({
-                    $or: [
-                        { "metadata.orderId": ord._id.toString() },
-                        { reference: { $regex: ord._id.toString() } },
-                    ],
+                    $or: paymentConditions,
                     status: "pending",
                 });
                 if (ordPayment && ordPayment.reference) {

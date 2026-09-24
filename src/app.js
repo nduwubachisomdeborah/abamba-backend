@@ -123,6 +123,14 @@ app.use(["/uploads", "/api/v1/upload", "/api/v1/uploads"], (req, res, next) => {
     next();
 });
 
+// Serve local uploads folder statically
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use("/uploads", express.static(uploadsDir));
+app.use("/api/v1/uploads", express.static(uploadsDir));
+
 // Connect to database with resilient options and auto-retry
 const mongooseOptions = {
     maxPoolSize: parseInt(process.env.MONGODB_MAX_POOL_SIZE || "50", 10),
@@ -168,12 +176,16 @@ const connectWithRetry = async (retryCount = 0) => {
             process.env.NODE_APP_INSTANCE === "0";
 
         if (isPrimaryInstance) {
-            paymentService.reconcilePendingPayments().catch((err) =>
-                console.error("Reconcile on boot error:", err?.message)
-            );
+            // Delay initial reconciliation slightly so MongoDB connection and startup seeding finish cleanly
+            setTimeout(() => {
+                paymentService.reconcilePendingPayments().catch((err) =>
+                    console.error("Reconcile on boot error:", err?.message)
+                );
+            }, 5000);
+
             setInterval(() => {
                 paymentService.reconcilePendingPayments().catch(() => {});
-            }, 45 * 1000);
+            }, 60 * 1000);
         }
     } catch (err) {
         console.error(`Could not connect to MongoDB (attempt ${retryCount + 1}):`, err.message);

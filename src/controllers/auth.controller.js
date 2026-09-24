@@ -195,11 +195,43 @@ class AuthController {
      */
     static switchRole = asyncHandler(async (req, res) => {
         const targetRole = req.body.role || req.body.targetRole || "user";
-        const result = await authService.switchRole(req.user.id, targetRole);
 
-        return successResponse(res, `Switched to ${targetRole} mode successfully`, {
+        // If switching to seller, verify the user has a seller registration
+        if (targetRole === "seller") {
+            const user = req.user;
+            const hasSeller =
+                user.role === "seller" ||
+                (Array.isArray(user.roles) && user.roles.includes("seller")) ||
+                Boolean(user.business?.businessName);
+
+            if (!hasSeller) {
+                return errorResponse(
+                    res,
+                    "You have not registered as a seller yet. Please complete seller registration first.",
+                    {},
+                    404
+                );
+            }
+        }
+
+        const userId = req.user.id || req.user._id;
+        const result = await authService.switchRole(userId, targetRole);
+
+        // Return a consistent shape: token (buyer), sellerToken (seller), user with _id + sellerId
+        const responsePayload = {
             user: result.user,
             token: result.token,
+            sellerToken: result.token, // Same unified JWT — frontend stores it as sellerToken when in seller mode
+        };
+
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            message: `Switched to ${targetRole} mode successfully`,
+            token: result.token,
+            sellerToken: result.token,
+            user: result.user,
+            data: responsePayload,
         });
     });
 }

@@ -118,10 +118,10 @@ router.patch(
     SellerController.updateNotificationSettings,
 );
 
-// Seller Order routes
-router.get("/orders", authenticate, OrderController.getOrders);
-router.get("/orders/:id", authenticate, OrderController.getOrderById);
-router.patch("/orders/:id/status", authenticate, OrderController.updateOrderStatus);
+// Seller Order routes — use getSellerOrders to enforce seller-only order scope
+router.get("/orders", authenticate, restrictTo("seller", "user", "buyer"), OrderController.getSellerOrders);
+router.get("/orders/:id", authenticate, restrictTo("seller", "user", "buyer"), OrderController.getOrderById);
+router.patch("/orders/:id/status", authenticate, restrictTo("seller", "user", "buyer"), OrderController.updateOrderStatus);
 
 // Seller Customer routes
 router.get("/customers", authenticate, restrictTo("seller"), CustomerController.getCustomers);

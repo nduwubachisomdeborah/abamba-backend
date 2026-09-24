@@ -214,6 +214,36 @@ class OrderService {
             filter.shipment = null;
         }
 
+        // Add search filter if provided
+        if (query.search) {
+            const searchTerm = query.search.trim();
+            const searchRegex = new RegExp(searchTerm, "i");
+            const searchOr = [
+                { "items.name": searchRegex },
+                { "shippingAddress.fullName": searchRegex },
+                { "shippingAddress.phoneNumber": searchRegex },
+                { "shippingAddress.city": searchRegex },
+            ];
+
+            const num = Number(searchTerm);
+            if (!isNaN(num)) {
+                searchOr.push({ orderId: num });
+            }
+            if (mongoose.Types.ObjectId.isValid(searchTerm)) {
+                searchOr.push({ _id: new mongoose.Types.ObjectId(searchTerm) });
+            }
+
+            if (filter.$or) {
+                const existingOr = filter.$or;
+                delete filter.$or;
+                filter.$and = [{ $or: existingOr }, { $or: searchOr }];
+            } else if (filter.$and) {
+                filter.$and.push({ $or: searchOr });
+            } else {
+                filter.$and = [{ $or: searchOr }];
+            }
+        }
+
         // Build sort object
         let sort = {};
         if (query.sort) {
@@ -296,9 +326,17 @@ class OrderService {
             user?.role === "admin" ||
             user?.roles?.includes("admin") ||
             user?.roles?.includes("superAdmin");
+        const isSeller =
+            userRole === "seller" ||
+            user?.role === "seller" ||
+            user?.roles?.includes("seller") ||
+            Boolean(user?.business);
 
-        // Only admin can update order status
-        if (!isAdmin) {
+        const sellerIdStr = (order.seller?._id || order.seller)?.toString();
+        const isOrderSeller = isSeller && sellerIdStr === userId?.toString();
+
+        // Allow admin or the order's seller to update order status
+        if (!isAdmin && !isOrderSeller) {
             throw new AppError("Not authorized to update order status", 403);
         }
 

@@ -140,6 +140,53 @@ class OrderController {
     
     return successResponse(res, 'Orders retrieved successfully', { orders, pagination });
   });
+
+  /**
+   * @desc    Get seller's own orders (scoped to the authenticated seller only)
+   * @route   GET /api/v1/sellers/orders
+   * @access  Private (sellerToken required — seller role)
+   */
+  static getSellerOrders = asyncHandler(async (req, res) => {
+    // Force seller scope: the seller ID is always the authenticated user's ID
+    const sellerId = (req.user?._id || req.user?.id || req.decodedToken?.sellerId || req.decodedToken?.id)?.toString();
+
+    // Build a seller-scoped query override so orderService always filters by this seller
+    const scopedQuery = {
+      ...req.query,
+      // Clear any buyer/admin-scope hints that could bleed through
+      scope: 'seller',
+      buyerOnly: undefined,
+    };
+
+    const { orders, pagination } = await orderService.getOrders(
+      scopedQuery,
+      sellerId,
+      'seller', // Force seller role regardless of the token's primary role
+      { ...req.user, role: 'seller' }
+    );
+
+    const paginationData = {
+      total: pagination.total,
+      page: pagination.page,
+      limit: pagination.limit || parseInt(req.query.limit) || 10,
+      pages: pagination.pages || pagination.totalPages || Math.ceil(pagination.total / (parseInt(req.query.limit) || 10)),
+      hasPrev: pagination.hasPrev ?? pagination.page > 1,
+      hasNext: pagination.hasNext ?? pagination.page < (pagination.pages || pagination.totalPages || 1),
+    };
+
+    // Return the exact shape the frontend expects
+    return res.status(200).json({
+      status: 200,
+      success: true,
+      message: 'Seller orders retrieved successfully',
+      orders,
+      pagination: paginationData,
+      data: {
+        orders,
+        pagination: paginationData,
+      },
+    });
+  });
   
   /**
    * @desc    Get order by ID

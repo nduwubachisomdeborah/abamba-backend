@@ -13,6 +13,7 @@ import sellerProductRoutes from "./seller.product.routes.js";
 import adminProductRoutes from "./admin.product.routes.js";
 import uploadRoutes from "./upload.routes.js";
 import sellerRoutes from "./seller.routes.js";
+import sellersRoutes from "./sellers.routes.js";
 import customerRoutes from "./customer.routes.js";
 import paymentRoutes from "./payment.routes.js";
 import storeLocationRoutes from "./storeLocation.routes.js";
@@ -40,6 +41,7 @@ router.use("/wishlists", wishlistRoutes);
 router.use("/subscriptions", subscriptionRoutes);
 router.use("/upload", uploadRoutes);
 router.use("/seller/products", sellerProductRoutes);
+router.use("/sellers", sellersRoutes); // Seller-scoped data endpoints (orders, etc.)
 router.use("/seller", sellerRoutes);
 router.use("/admin/products", adminProductRoutes);
 router.use("/customers", customerRoutes);

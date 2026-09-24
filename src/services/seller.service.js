@@ -25,17 +25,39 @@ class SellerService {
     };
 
     getUserById = async (id) => {
-        return await User.findById(id).select("+business +bank");
+        return await User.findById(id)
+            .select("+business +bank")
+            .populate({
+                path: "business",
+                populate: [
+                    { path: "personalDocument", model: "File" },
+                    { path: "businessDocument", model: "File" },
+                    { path: "storeLocation", model: "StoreLocation" },
+                ],
+            });
     };
 
     getSellerById = async (id) => {
-        return await User.findById(id).select("+business +bank");
+        return await User.findById(id)
+            .select("+business +bank")
+            .populate({
+                path: "business",
+                populate: [
+                    { path: "personalDocument", model: "File" },
+                    { path: "businessDocument", model: "File" },
+                    { path: "storeLocation", model: "StoreLocation" },
+                ],
+            });
     };
 
     updateProfilePicture = async (userId, profilePicture) => {
         const seller = await User.findOne({
             _id: userId,
-            role: "seller",
+            $or: [
+                { role: "seller" },
+                { roles: "seller" },
+                { "business.businessName": { $exists: true } },
+            ],
             deleted: false,
         }).select("name profilePicture");
 
@@ -45,6 +67,7 @@ class SellerService {
 
         seller.profilePicture = profilePicture;
         await seller.save();
+        userCache.del(userId.toString());
 
         return {
             id: seller._id,
@@ -56,7 +79,11 @@ class SellerService {
     updateBank = async (userId, bankData, otpCode) => {
         const seller = await User.findOne({
             _id: userId,
-            role: "seller",
+            $or: [
+                { role: "seller" },
+                { roles: "seller" },
+                { "business.businessName": { $exists: true } },
+            ],
             deleted: false,
         });
 
@@ -77,6 +104,7 @@ class SellerService {
         };
 
         await seller.save();
+        userCache.del(userId.toString());
 
         return seller.bank;
     };
@@ -84,7 +112,11 @@ class SellerService {
     updatePassword = async (userId, oldPassword, newPassword) => {
         const seller = await User.findOne({
             _id: userId,
-            role: "seller",
+            $or: [
+                { role: "seller" },
+                { roles: "seller" },
+                { "business.businessName": { $exists: true } },
+            ],
             deleted: false,
         }).select("+password googleId");
 
@@ -114,6 +146,7 @@ class SellerService {
 
         seller.password = newPassword;
         await seller.save();
+        userCache.del(userId.toString());
 
         return true;
     };
@@ -121,7 +154,11 @@ class SellerService {
     updateNotificationSettings = async (userId, updates) => {
         const seller = await User.findOne({
             _id: userId,
-            role: "seller",
+            $or: [
+                { role: "seller" },
+                { roles: "seller" },
+                { "business.businessName": { $exists: true } },
+            ],
             deleted: false,
         }).select("_id");
 

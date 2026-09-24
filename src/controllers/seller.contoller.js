@@ -82,7 +82,7 @@ class SellerController {
 
     /**
      * @desc    Verify OTP
-     * @route   POST /api/v1/auth/verify-otp
+     * @route   POST /api/v1/seller/verify-otp
      * @access  Public
      */
     static verifyOTP = asyncHandler(async (req, res) => {
@@ -90,7 +90,19 @@ class SellerController {
 
         const result = await authService.verifyOTP(email, otpCode, "seller");
 
-        return successResponse(res, "OTP verification successful.", result);
+        // Return token at top-level for frontend localStorage storage as sellerToken
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            message: "OTP verification successful.",
+            token: result.token,
+            sellerToken: result.token,
+            data: {
+                token: result.token,
+                sellerToken: result.token,
+                user: result.user,
+            },
+        });
     });
 
     /**
@@ -198,9 +210,46 @@ class SellerController {
     });
 
     static getSeller = asyncHandler(async (req, res) => {
-        const seller = await sellerService.getUserById(req.user._id);
+        const sellerId = (req.user?._id || req.user?.id)?.toString();
+        const rawSeller = await sellerService.getUserById(sellerId);
 
-        return successResponse(res, "Seller retrieved successfully", seller);
+        if (!rawSeller) {
+            return errorResponse(res, "Seller not found", {}, 404);
+        }
+
+        const sellerObj = rawSeller.toObject ? rawSeller.toObject() : { ...rawSeller };
+        delete sellerObj.password;
+        if (sellerObj.otp) delete sellerObj.otp.code;
+
+        // Guarantee _id and sellerId are always present
+        sellerObj._id = (sellerObj._id || sellerId)?.toString();
+        sellerObj.sellerId = sellerObj._id;
+
+        // Guarantee business shape: always { approved, message } or null if unconfigured
+        if (!sellerObj.business || !sellerObj.business.businessName) {
+            // No business yet — return null so frontend shows onboarding
+            sellerObj.business = null;
+            sellerObj.onboardingStatus = "uncompleted";
+        } else {
+            // Business exists — normalise approved + message fields
+            const biz = sellerObj.business.toObject ? sellerObj.business.toObject() : sellerObj.business;
+            sellerObj.business = {
+                ...biz,
+                approved: Boolean(biz.approved),
+                message: biz.message ?? "",
+            };
+            sellerObj.onboardingStatus = sellerObj.business.approved ? "approved" : "pending";
+        }
+
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            message: "Seller retrieved successfully",
+            _id: sellerObj._id,
+            sellerId: sellerObj.sellerId,
+            business: sellerObj.business,
+            data: sellerObj,
+        });
     });
 
     static updateProfilePicture = asyncHandler(async (req, res) => {
