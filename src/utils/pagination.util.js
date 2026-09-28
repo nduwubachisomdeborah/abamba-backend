@@ -9,7 +9,7 @@ class PaginationUtil {
    * @param {number} maxLimit - Hard upper ceiling for page size to prevent heap exhaustion
    * @returns {Object} Pagination options
    */
-  static getPaginationOptions(query, defaultLimit = 10, maxLimit = 100) {
+  static getPaginationOptions(query, defaultLimit = 10, maxLimit = 200) {
     const page = Math.max(1, parseInt(query.page) || 1);
     const parsedLimit = parseInt(query.limit) || defaultLimit;
     const limit = Math.min(maxLimit, Math.max(1, parsedLimit));

@@ -217,6 +217,10 @@ const productSchema = new mongoose.Schema(
             default: false,
             index: true,
         },
+        recommendationOrder: {
+            type: Number,
+            default: 0,
+        },
         rating: {
             type: Number,
             default: 0,
@@ -337,6 +341,7 @@ productSchema.index({ category: 1, createdAt: -1 });
 productSchema.index({ deleted: 1, approved: 1, disabled: 1, category: 1, createdAt: -1 });
 productSchema.index({ deleted: 1, approved: 1, disabled: 1, featured: 1, createdAt: -1 });
 productSchema.index({ deleted: 1, approved: 1, disabled: 1, isRecommended: 1, createdAt: -1 });
+productSchema.index({ deleted: 1, approved: 1, disabled: 1, isRecommended: 1, recommendationOrder: 1, createdAt: -1 });
 productSchema.index({ deleted: 1, approved: 1, disabled: 1, onSale: 1, createdAt: -1 });
 productSchema.index({ deleted: 1, approved: 1, disabled: 1, user: 1, createdAt: -1 });
 
