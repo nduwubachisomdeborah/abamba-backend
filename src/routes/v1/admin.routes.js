@@ -174,6 +174,13 @@ router.patch(
     AdminController.rejectProduct,
 );
 
+router.patch(
+    "/products/:id/toggle-recommend",
+    authenticate,
+    adminOnly,
+    AdminController.toggleProductRecommendation,
+);
+
 router.get(
     "/products",
     authenticate,

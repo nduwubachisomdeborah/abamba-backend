@@ -1,3 +1,4 @@
+
 import { Router } from 'express';
 import AdminProductController from '../../controllers/admin.product.controller.js';
 import { authenticate, restrictTo } from '../../middlewares/auth.js';
@@ -22,5 +23,6 @@ router.patch('/:id/reject', AdminProductController.rejectProductApproval);
 // Product disable/enable endpoints
 router.patch('/:id/disable', validateDisableReason, AdminProductController.disableProduct);
 router.patch('/:id/enable', AdminProductController.enableProduct);
+router.patch('/:id/toggle-recommend', AdminProductController.toggleProductRecommendation);
 
 export default router;

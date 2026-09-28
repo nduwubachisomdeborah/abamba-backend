@@ -459,6 +459,12 @@ class ProductService {
             filter.featured = query.featured === "true";
         }
 
+        // Add recommended filter if provided
+        if (query.isRecommended !== undefined || query.recommended !== undefined) {
+            const recVal = query.isRecommended ?? query.recommended;
+            filter.isRecommended = recVal === "true" || recVal === true;
+        }
+
         // Add promo filter if provided (filter by products with active promotions)
         if (query.promoActive === "true") {
             const now = new Date();

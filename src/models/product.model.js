@@ -212,6 +212,11 @@ const productSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        isRecommended: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
         rating: {
             type: Number,
             default: 0,
@@ -331,6 +336,7 @@ productSchema.index({ category: 1, createdAt: -1 });
 // High-speed compound indexes for active marketplace catalog queries
 productSchema.index({ deleted: 1, approved: 1, disabled: 1, category: 1, createdAt: -1 });
 productSchema.index({ deleted: 1, approved: 1, disabled: 1, featured: 1, createdAt: -1 });
+productSchema.index({ deleted: 1, approved: 1, disabled: 1, isRecommended: 1, createdAt: -1 });
 productSchema.index({ deleted: 1, approved: 1, disabled: 1, onSale: 1, createdAt: -1 });
 productSchema.index({ deleted: 1, approved: 1, disabled: 1, user: 1, createdAt: -1 });
 

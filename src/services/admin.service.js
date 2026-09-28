@@ -327,6 +327,14 @@ class AdminService {
             }
         }
 
+        if (options.isRecommended !== undefined) {
+            if (options.isRecommended === "true" || options.isRecommended === true) {
+                query.isRecommended = true;
+            } else if (options.isRecommended === "false" || options.isRecommended === false) {
+                query.isRecommended = false;
+            }
+        }
+
         const [products, totalProducts] = await Promise.all([
             Product.find(query)
                 .populate({ path: "user", select: "name email" })

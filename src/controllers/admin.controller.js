@@ -10,6 +10,7 @@ import CourierService from "../models/courierService.model.js";
 import Transaction from "../models/transaction.model.js";
 import Order from "../models/order.model.js";
 import Shipment from "../models/shipment.model.js";
+import Product from "../models/product.model.js";
 
 class AdminController {
     static login = asyncHandler(async (req, res) => {
@@ -310,6 +311,37 @@ class AdminController {
         );
 
         return successResponse(res, "Product rejected successfully", product);
+    });
+
+    static toggleProductRecommendation = asyncHandler(async (req, res) => {
+        const targetId = req.params.id || req.params.productId;
+        const { isRecommended } = req.body;
+
+        let product;
+        if (typeof isRecommended !== "undefined") {
+            product = await Product.findByIdAndUpdate(
+                targetId,
+                { isRecommended: Boolean(isRecommended) },
+                { new: true }
+            );
+        } else {
+            const current = await Product.findById(targetId);
+            if (!current) {
+                return res.status(404).json({ success: false, message: "Product not found" });
+            }
+            current.isRecommended = !current.isRecommended;
+            product = await current.save();
+        }
+
+        if (!product) {
+            return res.status(404).json({ success: false, message: "Product not found" });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: `Product ${product.isRecommended ? "pinned to" : "unpinned from"} Recommended`,
+            data: product,
+        });
     });
 
     static getPlatformSettings = asyncHandler(async (req, res) => {
