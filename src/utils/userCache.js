@@ -53,6 +53,18 @@ class UserCache {
         this.data.delete(userId.toString());
     }
 
+    del(userId) {
+        return this.invalidate(userId);
+    }
+
+    delete(userId) {
+        return this.invalidate(userId);
+    }
+
+    clear() {
+        this.data.clear();
+    }
+
     cleanup() {
         const now = Date.now();
         for (const [key, value] of this.data.entries()) {
