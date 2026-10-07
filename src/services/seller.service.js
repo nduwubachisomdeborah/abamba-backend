@@ -584,6 +584,13 @@ class SellerService {
             personalDocId = null;
         }
 
+        if (!personalDocId) {
+            throw new AppError(
+                "A valid ID document (e.g. NIN, International Passport, or Driver's License) must be uploaded",
+                400
+            );
+        }
+
         if (businessDocId && mongoose.Types.ObjectId.isValid(businessDocId)) {
             const businessDocument = await fileService.hasFile(businessDocId);
             if (!businessDocument) {

@@ -59,7 +59,10 @@ export const sellerOnBoardingSchema = Joi.object({
     businessAddress: addressSchema.required(),
     businessPhone: Joi.string().required(),
     businessEmail: Joi.string().email().required(),
-    documentType: Joi.string().allow("", null).optional(),
+    documentType: Joi.string().trim().required().messages({
+        "any.required": "Document type is required",
+        "string.empty": "Document type cannot be empty",
+    }),
     document: documentFieldSchema,
     personalDocument: documentFieldSchema,
     businessDocument: documentFieldSchema,

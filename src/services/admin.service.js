@@ -817,6 +817,22 @@ class AdminService {
             );
         }
 
+        if (approved) {
+            if (!seller.business.businessName) {
+                throw new AppError(
+                    "Cannot approve seller: Business details are incomplete",
+                    400,
+                );
+            }
+
+            if (!seller.business.personalDocument) {
+                throw new AppError(
+                    "Cannot approve seller: A valid ID document (e.g. NIN, International Passport, or Driver's License) must be uploaded before approval",
+                    400,
+                );
+            }
+        }
+
         seller.business.approved = Boolean(approved);
         seller.business.message = approved ? "" : (message || "");
 
