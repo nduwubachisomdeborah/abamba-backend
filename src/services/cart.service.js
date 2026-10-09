@@ -102,16 +102,58 @@ class CartService {
             throw new AppError("Product not found", 404);
         }
 
+        // Fetch platform settings to check if global bonus week is active
+        const platformSettings = await PlatformSettings.getInstance();
+        const isBonusActive = Boolean(
+            platformSettings?.systemPreferences?.bonusWeekEnabled ??
+            platformSettings?.isBonusEventActive
+        );
+
         // Find the variant if provided
         let variant = null;
-        let price = Number(product.basePrice) || 0;
+        let baseProductPrice = Number(product.basePrice) || 0;
+        let price = baseProductPrice;
 
         if (variantId) {
             variant = product.variants.id(variantId);
             if (!variant) {
                 throw new AppError("Variant not found", 404);
             }
-            price = Number(variant.price) || price;
+            const variantBase = Number(variant.price) || baseProductPrice;
+            const variantBonus =
+                variant.bonusPrice !== undefined &&
+                variant.bonusPrice !== null &&
+                variant.bonusPrice !== ""
+                    ? Number(variant.bonusPrice)
+                    : (product.bonusPrice !== undefined &&
+                       product.bonusPrice !== null &&
+                       product.bonusPrice !== ""
+                          ? Number(product.bonusPrice)
+                          : null);
+            const variantPromo =
+                variant.promoPrice !== undefined &&
+                variant.promoPrice !== null &&
+                variant.promoPrice !== ""
+                    ? Number(variant.promoPrice)
+                    : null;
+
+            if (
+                isBonusActive &&
+                variantBonus !== null &&
+                variantBonus > 0 &&
+                variantBonus < variantBase
+            ) {
+                price = variantBonus;
+            } else if (
+                (product.onSale || product.promoActive) &&
+                variantPromo !== null &&
+                variantPromo > 0 &&
+                variantPromo < variantBase
+            ) {
+                price = variantPromo;
+            } else {
+                price = variantBase;
+            }
 
             // Check variant stock
             if (variant.quantity < quantity) {
@@ -121,6 +163,37 @@ class CartService {
                 );
             }
         } else {
+            const prodBonus =
+                product.bonusPrice !== undefined &&
+                product.bonusPrice !== null &&
+                product.bonusPrice !== ""
+                    ? Number(product.bonusPrice)
+                    : null;
+            const prodPromo =
+                product.promoPrice !== undefined &&
+                product.promoPrice !== null &&
+                product.promoPrice !== ""
+                    ? Number(product.promoPrice)
+                    : null;
+
+            if (
+                isBonusActive &&
+                prodBonus !== null &&
+                prodBonus > 0 &&
+                prodBonus < baseProductPrice
+            ) {
+                price = prodBonus;
+            } else if (
+                (product.onSale || product.promoActive) &&
+                prodPromo !== null &&
+                prodPromo > 0 &&
+                prodPromo < baseProductPrice
+            ) {
+                price = prodPromo;
+            } else {
+                price = baseProductPrice;
+            }
+
             // Check product stock
             if (product.quantity < quantity) {
                 throw new AppError(
@@ -326,8 +399,9 @@ class CartService {
         });
 
         if (existingItemIndex > -1) {
-            // Update existing item quantity
+            // Update existing item quantity and refresh unit price
             cart.items[existingItemIndex].quantity += quantity;
+            cart.items[existingItemIndex].price = Number(price) || cart.items[existingItemIndex].price;
             if (shipping) {
                 cart.items[existingItemIndex].shipping = shipping;
             }
@@ -717,6 +791,18 @@ class CartService {
                     }
                 }
 
+                // Explicitly assign final price to itemObj and product object
+                itemObj.price = finalPrice;
+                itemObj.unitPrice = finalPrice;
+                itemObj.sellingPrice = finalPrice;
+                itemObj.currentPrice = finalPrice;
+                itemObj.basePrice = regularPrice;
+                itemObj.total = finalPrice * item.quantity;
+                itemObj.totalPrice = finalPrice * item.quantity;
+                itemObj.formattedPrice = `₦${finalPrice.toLocaleString()}`;
+                itemObj.formattedTotal = `₦${(finalPrice * item.quantity).toLocaleString()}`;
+                itemObj.formattedRegularPrice = `₦${regularPrice.toLocaleString()}`;
+
                 const primaryImage =
                     (product?.images && product.images[0]?.url) ||
                     (typeof product?.images?.[0] === "string"
@@ -730,12 +816,19 @@ class CartService {
                 itemObj.name = product?.name || itemObj.name || "Product";
                 if (itemObj.product && typeof itemObj.product === "object") {
                     itemObj.product.image = primaryImage;
+                    itemObj.product.price = finalPrice;
+                    itemObj.product.currentPrice = finalPrice;
+                    itemObj.product.sellingPrice = finalPrice;
+                    itemObj.product.slashedPrice = (finalPrice < regularPrice) ? regularPrice : null;
+                    itemObj.product.formattedPrice = `₦${finalPrice.toLocaleString()}`;
+                    itemObj.product.formattedCurrentPrice = `₦${finalPrice.toLocaleString()}`;
+                    itemObj.product.formattedOriginalPrice = `₦${regularPrice.toLocaleString()}`;
                 }
 
                 // Update totals (only count available items in total)
                 if (itemObj.isAvailable) {
                     totalItems += item.quantity;
-                    totalPrice += itemObj.price * item.quantity;
+                    totalPrice += finalPrice * item.quantity;
                 }
 
                 return itemObj;
@@ -800,6 +893,20 @@ class CartService {
                 ? Number(totalPrice || 0) + Number(totalShippingFee || 0)
                 : 0;
 
+        // Synchronize item prices and totals back to database cart
+        if (populatedCart.items && populatedCart.items.length > 0) {
+            for (const it of populatedCart.items) {
+                const enh = enhancedItems.find((e) => {
+                    const eId = e._id ? e._id.toString() : null;
+                    const itId = it._id ? it._id.toString() : null;
+                    return eId && itId && eId === itId;
+                });
+                if (enh && typeof enh.price === "number") {
+                    it.price = enh.price;
+                }
+            }
+        }
+
         // Update cart totals in memory only
         const result = populatedCart.toObject();
         result.items = enhancedItems;
@@ -819,6 +926,7 @@ class CartService {
         // Save only the essential cart data back to the database
         // This prevents loss of calculated fields that aren't part of the schema
         await Cart.findByIdAndUpdate(cart._id, {
+            items: populatedCart.items,
             totalItems: totalItems,
             totalPrice: totalPrice,
             lastUpdated: new Date(),
@@ -921,13 +1029,79 @@ class CartService {
             if (!product) continue;
 
             let maxStock = product.quantity || 0;
-            let price = Number(product.basePrice) || 0;
+            let regularPrice = Number(product.basePrice) || 0;
+            let price = regularPrice;
 
             if (variantId) {
                 const variant = product.variants?.id?.(variantId);
                 if (!variant) continue;
                 maxStock = variant.quantity || 0;
-                price = Number(variant.price) || price;
+                regularPrice = Number(variant.price) || regularPrice;
+                const variantBonus =
+                    variant.bonusPrice !== undefined &&
+                    variant.bonusPrice !== null &&
+                    variant.bonusPrice !== ""
+                        ? Number(variant.bonusPrice)
+                        : (product.bonusPrice !== undefined &&
+                           product.bonusPrice !== null &&
+                           product.bonusPrice !== ""
+                              ? Number(product.bonusPrice)
+                              : null);
+                const variantPromo =
+                    variant.promoPrice !== undefined &&
+                    variant.promoPrice !== null &&
+                    variant.promoPrice !== ""
+                        ? Number(variant.promoPrice)
+                        : null;
+
+                if (
+                    isBonusActive &&
+                    variantBonus !== null &&
+                    variantBonus > 0 &&
+                    variantBonus < regularPrice
+                ) {
+                    price = variantBonus;
+                } else if (
+                    (product.onSale || product.promoActive) &&
+                    variantPromo !== null &&
+                    variantPromo > 0 &&
+                    variantPromo < regularPrice
+                ) {
+                    price = variantPromo;
+                } else {
+                    price = regularPrice;
+                }
+            } else {
+                const prodBonus =
+                    product.bonusPrice !== undefined &&
+                    product.bonusPrice !== null &&
+                    product.bonusPrice !== ""
+                        ? Number(product.bonusPrice)
+                        : null;
+                const prodPromo =
+                    product.promoPrice !== undefined &&
+                    product.promoPrice !== null &&
+                    product.promoPrice !== ""
+                        ? Number(product.promoPrice)
+                        : null;
+
+                if (
+                    isBonusActive &&
+                    prodBonus !== null &&
+                    prodBonus > 0 &&
+                    prodBonus < regularPrice
+                ) {
+                    price = prodBonus;
+                } else if (
+                    (product.onSale || product.promoActive) &&
+                    prodPromo !== null &&
+                    prodPromo > 0 &&
+                    prodPromo < regularPrice
+                ) {
+                    price = prodPromo;
+                } else {
+                    price = regularPrice;
+                }
             }
 
             if (maxStock <= 0) continue;
@@ -945,6 +1119,7 @@ class CartService {
                     currentQty + quantity,
                     maxStock
                 );
+                userCart.items[existingIndex].price = price;
                 if (item.shipping && !userCart.items[existingIndex].shipping) {
                     userCart.items[existingIndex].shipping = item.shipping;
                 }
@@ -953,7 +1128,7 @@ class CartService {
                     product: productId,
                     variant: variantId,
                     quantity: Math.min(quantity, maxStock),
-                    price: Number(item.price) || price,
+                    price: price,
                     shipping: item.shipping || {
                         amount: 3000,
                         price: 3000,

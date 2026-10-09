@@ -191,6 +191,13 @@ class PaymentService {
             addressId = defaultAddress?._id || null;
         }
 
+        // Fetch platform settings for global bonus promotions
+        const platformSettings = await PlatformSettings.getInstance();
+        const isBonusActive = Boolean(
+            platformSettings?.systemPreferences?.bonusWeekEnabled ??
+            platformSettings?.isBonusEventActive
+        );
+
         // Load cart
         let cart = await Cart.findOne({ user: userId });
 
@@ -212,17 +219,53 @@ class PaymentService {
                     const prodDoc = await Product.findOne({ _id: prodId, deleted: false });
                     if (prodDoc) {
                         const qty = Math.max(1, Number(itm.quantity) || 1);
-                        const unitPrice = Number(itm.price) || prodDoc.basePrice;
+                        const vId =
+                            itm.variantId && mongoose.Types.ObjectId.isValid(itm.variantId)
+                                ? itm.variantId
+                                : null;
+                        const varDoc = vId ? prodDoc.variants?.id?.(vId) : null;
+                        const basePr = varDoc ? Number(varDoc.price) || prodDoc.basePrice : Number(prodDoc.basePrice) || 0;
+                        const vBonus = varDoc
+                            ? (varDoc.bonusPrice !== undefined && varDoc.bonusPrice !== null && varDoc.bonusPrice !== ""
+                                ? Number(varDoc.bonusPrice)
+                                : (prodDoc.bonusPrice !== undefined && prodDoc.bonusPrice !== null && prodDoc.bonusPrice !== ""
+                                    ? Number(prodDoc.bonusPrice)
+                                    : null))
+                            : (prodDoc.bonusPrice !== undefined && prodDoc.bonusPrice !== null && prodDoc.bonusPrice !== ""
+                                ? Number(prodDoc.bonusPrice)
+                                : null);
+                        const vPromo = varDoc
+                            ? (varDoc.promoPrice !== undefined && varDoc.promoPrice !== null && varDoc.promoPrice !== ""
+                                ? Number(varDoc.promoPrice)
+                                : null)
+                            : (prodDoc.promoPrice !== undefined && prodDoc.promoPrice !== null && prodDoc.promoPrice !== ""
+                                ? Number(prodDoc.promoPrice)
+                                : null);
+
+                        let calculatedUnitPrice = basePr;
+                        if (
+                            isBonusActive &&
+                            vBonus !== null &&
+                            vBonus > 0 &&
+                            vBonus < basePr
+                        ) {
+                            calculatedUnitPrice = vBonus;
+                        } else if (
+                            (prodDoc.onSale || prodDoc.promoActive) &&
+                            vPromo !== null &&
+                            vPromo > 0 &&
+                            vPromo < basePr
+                        ) {
+                            calculatedUnitPrice = vPromo;
+                        }
+
                         const itemShipFee = Number(itm.shippingFee || itm.shipping?.amount || orderData.shippingFee || 3000);
                         cart.items.push({
                             product: prodDoc._id,
-                            variant:
-                                itm.variantId && mongoose.Types.ObjectId.isValid(itm.variantId)
-                                    ? itm.variantId
-                                    : null,
+                            variant: vId,
                             quantity: qty,
-                            price: unitPrice,
-                            total: unitPrice * qty,
+                            price: calculatedUnitPrice,
+                            total: calculatedUnitPrice * qty,
                             shipping: {
                                 amount: itemShipFee,
                             },
@@ -245,13 +288,6 @@ class PaymentService {
                 400,
             );
         }
-
-        // Fetch platform settings for global bonus promotions
-        const platformSettings = await PlatformSettings.getInstance();
-        const isBonusActive = Boolean(
-            platformSettings?.systemPreferences?.bonusWeekEnabled ??
-            platformSettings?.isBonusEventActive
-        );
 
         // Build order items with validation against products/variants
         const enrichedItems = await Promise.all(
