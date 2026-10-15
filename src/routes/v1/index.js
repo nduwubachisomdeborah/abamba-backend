@@ -40,7 +40,7 @@ router.use("/shipments", shipmentRoutes);
 router.use("/wishlists", wishlistRoutes);
 router.use("/subscriptions", subscriptionRoutes);
 router.use("/upload", uploadRoutes);
-router.use("/seller/products", sellerProductRoutes);
+router.use(["/seller/products", "/seller/product"], sellerProductRoutes);
 router.use("/sellers", sellersRoutes); // Seller-scoped data endpoints (orders, etc.)
 router.use("/seller", sellerRoutes);
 router.use("/admin/products", adminProductRoutes);

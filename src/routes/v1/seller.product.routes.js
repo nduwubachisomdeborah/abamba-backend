@@ -3,6 +3,7 @@ import SellerProductController from "../../controllers/seller.product.controller
 import { authenticate, restrictTo } from "../../middlewares/auth.js";
 import {
     productSchema,
+    updateProductSchema,
     variantSchema,
     promotionSchema,
 } from "../../validators/seller.product.validator.js";
@@ -25,7 +26,12 @@ router.post(
 router.get("/:id", SellerProductController.getProduct);
 router.put(
     "/:id",
-    validate(productSchema),
+    validate(updateProductSchema),
+    SellerProductController.updateProduct
+);
+router.patch(
+    "/:id",
+    validate(updateProductSchema),
     SellerProductController.updateProduct
 );
 

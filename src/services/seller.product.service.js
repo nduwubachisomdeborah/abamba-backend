@@ -3,8 +3,71 @@ import CategoryOption from "../models/categoryOptions.model.js";
 import PlatformSettings from "../models/platformSettings.model.js";
 import { AppError } from "../middlewares/error.js";
 import PaginationUtil from "../utils/pagination.util.js";
+import { processPromoInfo } from "./promo.helper.js";
 
 class SellerProductService {
+    /**
+     * Convert variant attributes Map to regular objects for all variants in a product
+     * @param {Object} productObj - Product object with variants to process
+     * @returns {Object} The product with variant attributes properly converted
+     */
+    _convertVariantAttributes(productObj) {
+        if (!productObj || !productObj.variants || productObj.variants.length === 0) {
+            return productObj;
+        }
+
+        productObj.variants = productObj.variants.map((variant) => {
+            if (
+                variant.attributes &&
+                (variant.attributes instanceof Map ||
+                    variant.attributes.size > 0)
+            ) {
+                variant.attributes =
+                    variant.attributes instanceof Map
+                        ? Object.fromEntries(variant.attributes)
+                        : variant.attributes;
+            }
+            return variant;
+        });
+
+        return productObj;
+    }
+
+    /**
+     * Extract unique variant attributes from a product
+     * @param {Object} product - Product document
+     * @returns {Object} Object with attribute names as keys and arrays of unique values as values
+     */
+    _extractUniqueVariantAttributes(product) {
+        if (!product || !product.variants || product.variants.length === 0) {
+            return {};
+        }
+
+        const attributeMap = {};
+
+        product.variants.forEach((variant) => {
+            if (variant.attributes) {
+                const attributes =
+                    variant.attributes instanceof Map
+                        ? Object.fromEntries(variant.attributes)
+                        : variant.attributes;
+
+                if (attributes && typeof attributes === "object") {
+                    Object.entries(attributes).forEach(([key, value]) => {
+                        if (!attributeMap[key]) {
+                            attributeMap[key] = [];
+                        }
+                        if (!attributeMap[key].includes(value)) {
+                            attributeMap[key].push(value);
+                        }
+                    });
+                }
+            }
+        });
+
+        return attributeMap;
+    }
+
     /**
      * Get all products for a specific seller with pagination
      * @param {string} sellerId - ID of the seller
@@ -111,10 +174,25 @@ class SellerProductService {
             .skip(skip)
             .limit(limit);
 
+        // Fetch platform settings to check if global bonus week is active
+        const platformSettings = await PlatformSettings.getInstance();
+        const isBonusActive = Boolean(
+            platformSettings?.systemPreferences?.bonusWeekEnabled ??
+            platformSettings?.isBonusEventActive
+        );
+
+        // Process products with promo and bonus pricing
+        const processedProducts = products.map((prod) => {
+            let productObj = prod.toObject ? prod.toObject() : { ...prod };
+            this._convertVariantAttributes(productObj);
+            productObj = processPromoInfo(productObj, isBonusActive);
+            return productObj;
+        });
+
         // Generate pagination info
         const pagination = PaginationUtil.getPaginationData(total, page, limit);
 
-        return { products, pagination };
+        return { products: processedProducts, pagination };
     }
 
     /**
@@ -147,20 +225,64 @@ class SellerProductService {
             }
         }
 
+        // Support both basePrice and price seamlessly
+        const effectivePrice =
+            productData.basePrice !== undefined && productData.basePrice !== null && productData.basePrice !== ""
+                ? productData.basePrice
+                : productData.price;
+        productData.basePrice = Number(effectivePrice) || 0;
+        if (productData.basePrice < 0) {
+            throw new AppError("Base price must be a positive number", 400);
+        }
+
+        // Ensure weight defaults gracefully
+        productData.weight =
+            productData.weight !== undefined && productData.weight !== null && productData.weight !== ""
+                ? Number(productData.weight)
+                : 0;
+
         // Enforce max 50 for stock and bounds for lowStockAlert
         if (productData.quantity !== undefined) {
-            productData.quantity = Math.min(Math.max(Number(productData.quantity) || 0, 0), 50);
+            productData.quantity = Math.min(Math.max(Number(productData.quantity) || 1, 0), 50);
+        } else {
+            productData.quantity = 1;
         }
+
         if (productData.lowStockAlert !== undefined && productData.lowStockAlert !== null) {
             productData.lowStockAlert = Math.min(Math.max(Number(productData.lowStockAlert) || 2, 1), 2);
         } else {
             productData.lowStockAlert = 2;
         }
 
-        // Enforce variant quantities if present
+        // Normalize images (support array of objects, array of string URLs, or single image field)
+        if (Array.isArray(productData.images) && productData.images.length > 0) {
+            productData.images = productData.images
+                .map((img) => {
+                    if (typeof img === "string") {
+                        return { url: img, altText: productData.name || "Product image" };
+                    }
+                    if (img && typeof img === "object") {
+                        return {
+                            url: img.url || img.imageUrl || "",
+                            thumbnail: img.thumbnail || "",
+                            medium: img.medium || "",
+                            altText: img.altText || productData.name || "Product image",
+                        };
+                    }
+                    return null;
+                })
+                .filter((img) => Boolean(img && img.url));
+        } else if (productData.image || productData.thumbnail) {
+            const singleImg = productData.image || productData.thumbnail;
+            productData.images = [{ url: singleImg, altText: productData.name || "Product image" }];
+        }
+
+        // Enforce variant quantities and weight if present
         if (Array.isArray(productData.variants)) {
             productData.variants = productData.variants.map((v) => ({
                 ...v,
+                weight: v.weight !== undefined && v.weight !== null ? Number(v.weight) : 0,
+                price: Number(v.price) || productData.basePrice,
                 quantity: v.quantity !== undefined ? Math.min(Math.max(Number(v.quantity) || 0, 0), 50) : 0,
             }));
         }
@@ -168,8 +290,10 @@ class SellerProductService {
         // Handle promotional pricing
         if (
             productData.promoPrice !== undefined &&
-            productData.promoPrice !== null
+            productData.promoPrice !== null &&
+            productData.promoPrice !== ""
         ) {
+            productData.promoPrice = Number(productData.promoPrice);
             if (productData.promoPrice <= 0) {
                 throw new AppError(
                     "Promotional price must be a positive number",
@@ -194,84 +318,55 @@ class SellerProductService {
             platformSettings?.isBonusEventActive
         );
 
-        if (isBonusActive) {
-            // When bonus week is ACTIVE: bonusPrice is strictly required and must be lower than basePrice
-            if (
-                productData.bonusPrice === undefined ||
-                productData.bonusPrice === null ||
-                productData.bonusPrice === ""
-            ) {
-                throw new AppError(
-                    "Bonus price is required while Bonus Week promotion is active",
-                    400
-                );
-            }
-
-            productData.bonusPrice = Number(productData.bonusPrice);
-            if (isNaN(productData.bonusPrice) || productData.bonusPrice <= 0) {
-                throw new AppError(
-                    "Bonus price must be a positive number greater than 0",
-                    400
-                );
-            }
-
-            if (productData.bonusPrice >= productData.basePrice) {
-                throw new AppError(
-                    "Bonus price must be less than the product base price",
-                    400
-                );
-            }
-
-            // Also enforce on variants if provided
-            if (Array.isArray(productData.variants) && productData.variants.length > 0) {
-                for (const v of productData.variants) {
-                    if (
-                        v.bonusPrice === undefined ||
-                        v.bonusPrice === null ||
-                        v.bonusPrice === ""
-                    ) {
-                        throw new AppError(
-                            "Bonus price is required for each variant while Bonus Week is active",
-                            400
-                        );
-                    }
-                    v.bonusPrice = Number(v.bonusPrice);
-                    if (isNaN(v.bonusPrice) || v.bonusPrice <= 0) {
-                        throw new AppError(
-                            "Variant bonus price must be greater than 0",
-                            400
-                        );
-                    }
-                    if (v.bonusPrice >= v.price) {
-                        throw new AppError(
-                            "Variant bonus price must be less than the variant price",
-                            400
-                        );
-                    }
-                }
-            }
-        } else {
-            // When bonus week is OFF: bonusPrice is optional
-            if (
-                productData.bonusPrice !== undefined &&
-                productData.bonusPrice !== null &&
-                productData.bonusPrice !== ""
-            ) {
-                productData.bonusPrice = Number(productData.bonusPrice);
-                if (productData.bonusPrice > 0 && productData.bonusPrice >= productData.basePrice) {
+        // Handle bonus pricing gracefully (allow products to be created with or without bonusPrice)
+        if (
+            productData.bonusPrice !== undefined &&
+            productData.bonusPrice !== null &&
+            productData.bonusPrice !== ""
+        ) {
+            const parsedBonus = Number(productData.bonusPrice);
+            if (!isNaN(parsedBonus) && parsedBonus > 0) {
+                if (parsedBonus >= productData.basePrice) {
                     throw new AppError(
                         "Bonus price must be less than the product base price",
                         400
                     );
                 }
+                productData.bonusPrice = parsedBonus;
             } else {
                 productData.bonusPrice = null;
             }
+
+            // Also check variants bonus price if provided
+            if (Array.isArray(productData.variants) && productData.variants.length > 0) {
+                for (const v of productData.variants) {
+                    if (
+                        v.bonusPrice !== undefined &&
+                        v.bonusPrice !== null &&
+                        v.bonusPrice !== ""
+                    ) {
+                        const vBonus = Number(v.bonusPrice);
+                        if (!isNaN(vBonus) && vBonus > 0 && vBonus < v.price) {
+                            v.bonusPrice = vBonus;
+                        } else {
+                            v.bonusPrice = null;
+                        }
+                    } else {
+                        v.bonusPrice = null;
+                    }
+                }
+            }
+        } else {
+            productData.bonusPrice = null;
         }
 
         // Create the product
         const product = await Product.create(productData);
-        return product;
+        let productObj = product.toObject ? product.toObject() : { ...product };
+        this._convertVariantAttributes(productObj);
+        productObj = processPromoInfo(productObj, isBonusActive);
+
+        return productObj;
     }
 
     /**
@@ -295,7 +390,18 @@ class SellerProductService {
             );
         }
 
-        return product;
+        const platformSettings = await PlatformSettings.getInstance();
+        const isBonusActive = Boolean(
+            platformSettings?.systemPreferences?.bonusWeekEnabled ??
+            platformSettings?.isBonusEventActive
+        );
+
+        let productObj = product.toObject ? product.toObject() : { ...product };
+        this._convertVariantAttributes(productObj);
+        productObj.variantAttributes = this._extractUniqueVariantAttributes(product);
+        productObj = processPromoInfo(productObj, isBonusActive);
+
+        return productObj;
     }
 
     /**
@@ -339,15 +445,27 @@ class SellerProductService {
             }
         }
 
+        // Support both price and basePrice seamlessly
+        if (updateData.price !== undefined && updateData.basePrice === undefined) {
+            updateData.basePrice = Number(updateData.price);
+        } else if (updateData.basePrice !== undefined) {
+            updateData.basePrice = Number(updateData.basePrice);
+        }
+
+        if (updateData.weight !== undefined) {
+            updateData.weight = Number(updateData.weight) || 0;
+        }
+
         // Handle promotional pricing
         if (updateData.promoPrice !== undefined) {
-            if (updateData.promoPrice === null) {
+            if (updateData.promoPrice === null || updateData.promoPrice === "") {
                 // Removing promo price
+                updateData.promoPrice = null;
                 updateData.onSale = false;
                 updateData.saleStartDate = null;
                 updateData.saleEndDate = null;
             } else {
-                // Adding or updating promo price
+                updateData.promoPrice = Number(updateData.promoPrice);
                 if (updateData.promoPrice <= 0) {
                     throw new AppError(
                         "Promotional price must be a positive number",
@@ -355,7 +473,7 @@ class SellerProductService {
                     );
                 }
 
-                const basePrice = updateData.basePrice || product.basePrice;
+                const basePrice = updateData.basePrice !== undefined ? updateData.basePrice : product.basePrice;
                 if (updateData.promoPrice >= basePrice) {
                     throw new AppError(
                         "Promotional price must be less than the base price",
@@ -376,14 +494,15 @@ class SellerProductService {
             ) {
                 updateData.bonusPrice = null;
             } else {
-                updateData.bonusPrice = Number(updateData.bonusPrice);
-                const basePrice = updateData.basePrice || product.basePrice;
-                if (updateData.bonusPrice >= basePrice) {
+                const parsedBonus = Number(updateData.bonusPrice);
+                const currentBase = updateData.basePrice !== undefined ? updateData.basePrice : product.basePrice;
+                if (parsedBonus >= currentBase) {
                     throw new AppError(
                         "Bonus price must be less than the product base price",
                         400
                     );
                 }
+                updateData.bonusPrice = parsedBonus;
             }
         }
 
@@ -397,25 +516,65 @@ class SellerProductService {
         if (Array.isArray(updateData.variants)) {
             updateData.variants = updateData.variants.map((v) => ({
                 ...v,
+                weight: v.weight !== undefined && v.weight !== null ? Number(v.weight) : 0,
+                price: Number(v.price) || (updateData.basePrice || product.basePrice),
                 quantity: v.quantity !== undefined ? Math.min(Math.max(Number(v.quantity) || 0, 0), 50) : 0,
             }));
         }
+
+        // Normalize images if provided
+        if (Array.isArray(updateData.images)) {
+            updateData.images = updateData.images
+                .map((img) => {
+                    if (typeof img === "string") {
+                        return { url: img, altText: updateData.name || product.name || "Product image" };
+                    }
+                    if (img && typeof img === "object") {
+                        return {
+                            url: img.url || img.imageUrl || "",
+                            thumbnail: img.thumbnail || "",
+                            medium: img.medium || "",
+                            altText: img.altText || updateData.name || product.name || "Product image",
+                        };
+                    }
+                    return null;
+                })
+                .filter((img) => Boolean(img && img.url));
+        }
+
+        // Remove immutable/system fields from updateData
+        delete updateData._id;
+        delete updateData.id;
+        delete updateData.user;
+        delete updateData.createdAt;
+        delete updateData.updatedAt;
+        delete updateData.__v;
 
         // Update the product
         Object.keys(updateData).forEach((key) => {
             product[key] = updateData[key];
         });
 
-        product.approved = false;
-        product.status = "pending";
-        product.approvedAt = null;
-        product.approvedBy = null;
-        product.rejectedAt = null;
-        product.rejectedBy = null;
-        product.rejectedReason = null;
+        // Preserve approved status for existing products; only reset if product was previously rejected
+        if (product.status === "rejected") {
+            product.status = "pending";
+            product.rejectedReason = null;
+        }
 
         await product.save();
-        return product;
+
+        const platformSettings = await PlatformSettings.getInstance();
+        const isBonusActive = Boolean(
+            platformSettings?.systemPreferences?.bonusWeekEnabled ??
+            platformSettings?.isBonusEventActive
+        );
+
+        let productObj = product.toObject ? product.toObject() : { ...product };
+        this._convertVariantAttributes(productObj);
+        productObj.variantAttributes = this._extractUniqueVariantAttributes(product);
+        productObj = processPromoInfo(productObj, isBonusActive);
+
+        return productObj;
     }
 
     /**
