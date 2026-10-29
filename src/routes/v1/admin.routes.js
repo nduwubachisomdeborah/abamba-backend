@@ -266,6 +266,18 @@ router.patch(
     validatePayoutRejection,
     AdminController.rejectPayout,
 );
+router.patch(
+    "/payouts/:id/revert",
+    authenticate,
+    adminOnly,
+    AdminController.revertPayout,
+);
+router.post(
+    "/payouts/:id/revert",
+    authenticate,
+    adminOnly,
+    AdminController.revertPayout,
+);
 
 // Shipping management routes
 router.get(

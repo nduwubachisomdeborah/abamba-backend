@@ -3,6 +3,7 @@ import Order from "../models/order.model.js";
 import User from "../models/user.model.js";
 import emailService from "../services/email.service.js";
 import notificationService from "../services/notification.service.js";
+import { releaseSellerFunds } from "../services/sellerFunds.service.js";
 import fs from "fs";
 import path from "path";
 
@@ -330,47 +331,21 @@ class WebhookController {
             const orders = await Order.find({ _id: { $in: shipment.orders } });
 
             for (const order of orders) {
-                // Update order status
-                order.status = "delivered";
+                // Update order status atomically
+                await Order.updateOne({ _id: order._id }, { $set: { status: "delivered" } });
 
-                // Release funds if still pending
-                if (order.sellerWalletStatus === "pending") {
-                    const creditAmount = Number(
-                        order.sellerEarnings !== undefined && order.sellerEarnings !== null
-                            ? order.sellerEarnings
-                            : Math.max(0, Number(order.subtotal || 0) - Number(order.platformFee || 0))
+                // Release funds exactly once (atomic claim; safe on webhook retries)
+                const release = await releaseSellerFunds(order._id);
+                if (release.released) {
+                    await notificationService.send(
+                        release.sellerId,
+                        "Funds Released",
+                        `Order #${release.orderRef} has been delivered. **₦${release.amount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}** is now available for withdrawal.`,
                     );
-                    if (order.seller && creditAmount > 0) {
-                        // Move from pending to balance
-                        const sellerUser = await User.findById(order.seller);
-                        if (sellerUser) {
-                            if (!sellerUser.wallet) {
-                                sellerUser.wallet = { balance: 0, pendingBalance: 0, holdBalance: 0 };
-                            }
-                            sellerUser.wallet.balance =
-                                (Number(sellerUser.wallet.balance) || 0) + creditAmount;
-                            sellerUser.wallet.pendingBalance = Math.max(
-                                0,
-                                (Number(sellerUser.wallet.pendingBalance) || 0) - creditAmount,
-                            );
-                            await sellerUser.save();
-                        }
-
-                        order.sellerWalletStatus = "paid";
-
-                        // Notify seller
-                        await notificationService.send(
-                            order.seller,
-                            "Funds Released",
-                            `Order #${order.orderId} has been delivered. **₦${creditAmount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}** is now available for withdrawal.`,
-                        );
-                        console.log(
-                            `[ShipBubble Webhook] Released funds for order: ${order.orderId}`,
-                        );
-                    }
+                    console.log(
+                        `[ShipBubble Webhook] Released funds for order: ${release.orderRef}`,
+                    );
                 }
-
-                await order.save();
             }
 
             console.log(

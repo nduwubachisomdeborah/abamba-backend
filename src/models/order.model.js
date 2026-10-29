@@ -192,6 +192,10 @@ const orderSchema = new mongoose.Schema(
             enum: ["pending", "paid"],
             default: "pending",
         },
+        fundsReleased: {
+            type: Boolean,
+            default: false,
+        },
         shippingAddress: addressSchema,
         addressId: {
             type: mongoose.Schema.Types.ObjectId,

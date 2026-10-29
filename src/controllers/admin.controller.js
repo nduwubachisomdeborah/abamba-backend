@@ -433,7 +433,7 @@ class AdminController {
         );
         const isManual = updatedTransaction.metadata?.payoutMethod === "manual_transfer";
         const message = isManual
-            ? "Payout approved successfully. (Paystack automated transfers are inactive on your Paystack account. Please disburse funds directly or contact Paystack support to activate transfers)."
+            ? "Payout marked as manually transferred."
             : "Payout approved and transfer initiated successfully!";
 
         return res.status(200).json({
@@ -458,6 +458,27 @@ class AdminController {
             status: 200,
             success: true,
             message: "Payout rejected. Funds returned to seller's available wallet balance.",
+            data: updatedTransaction,
+            payout: updatedTransaction,
+        });
+    });
+
+    /**
+     * Revert a payout that was wrongly marked completed (money never left the bank).
+     * Body: { reason?: string, refundToWallet?: boolean (default true) }
+     */
+    static revertPayout = asyncHandler(async (req, res) => {
+        const id = req.params.id || req.params.payoutId;
+        const { reason, refundToWallet } = req.body || {};
+        const updatedTransaction = await transactionService.revertPayout(id, {
+            reason,
+            refundToWallet: refundToWallet !== false,
+            revertedBy: req.user?._id || req.user?.id,
+        });
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            message: "Payout reverted successfully.",
             data: updatedTransaction,
             payout: updatedTransaction,
         });

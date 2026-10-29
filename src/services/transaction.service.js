@@ -4,6 +4,7 @@ import { AppError } from "../middlewares/error.js";
 import { v4 as uuidv4 } from "uuid";
 import PaystackService from "./payments/paystack.service.js";
 
+const MIN_PAYOUT_AMOUNT = Number(process.env.MIN_PAYOUT_AMOUNT) || 1000;
 class TransactionService {
     /**
      * Create a payout request
@@ -35,43 +36,72 @@ class TransactionService {
             );
         }
 
-        const currentBalance = Number(user.wallet?.balance ?? user.walletBalance ?? 0);
-        // Check if user has sufficient balance
-        if (currentBalance < amount) {
+        const requestedAmount = Number(amount);
+        if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+            throw new AppError("Please provide a valid withdrawal amount.", 400);
+        }
+
+        // Only one active withdrawal request at a time (prevents double-click duplicates)
+        const existingPending = await Transaction.findOne({
+            user: userId,
+            type: "payout",
+            status: { $in: ["pending", "processing"] },
+        });
+        if (existingPending) {
+            throw new AppError(
+                "You already have a withdrawal request awaiting approval. Please wait for it to be processed.",
+                400,
+            );
+        }
+
+        // Atomically lock funds: only succeeds if balance is still sufficient
+        const locked = await User.findOneAndUpdate(
+            { _id: userId, "wallet.balance": { $gte: requestedAmount } },
+            {
+                $inc: {
+                    "wallet.balance": -requestedAmount,
+                    "wallet.pendingBalance": requestedAmount,
+                },
+            },
+            { new: true },
+        );
+        if (!locked) {
             throw new AppError("Insufficient available wallet balance.", 400);
         }
 
-        // Generate unique reference
+        // Create transaction (ALWAYS pending - admin approval is required)
         const reference = `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-        // Create transaction with bank details from user profile or request body
-        const transaction = new Transaction({
-            user: userId,
-            type: "payout",
-            amount,
-            method: "bank_transfer",
-            accountDetails: {
-                bankName: bankInfo.bankName,
-                accountNumber: bankInfo.accountNumber?.toString(),
-                accountName: bankInfo.accountName,
-                bankCode: bankInfo.bankCode,
-            },
-            description: description || "Payout request",
-            reference,
-            status: "pending",
-        });
-
-        await transaction.save();
-
-        // Update user's wallet - move amount from balance to pendingBalance
-        if (!user.wallet) {
-            user.wallet = { balance: 0, pendingBalance: 0, holdBalance: 0 };
+        let transaction;
+        try {
+            transaction = new Transaction({
+                user: userId,
+                type: "payout",
+                amount: requestedAmount,
+                method: "bank_transfer",
+                accountDetails: {
+                    bankName: bankInfo.bankName,
+                    accountNumber: bankInfo.accountNumber?.toString(),
+                    accountName: bankInfo.accountName,
+                    bankCode: bankInfo.bankCode,
+                },
+                description: description || "Payout request",
+                reference,
+                status: "pending",
+            });
+            await transaction.save();
+        } catch (err) {
+            // Unlock the funds if the request record could not be saved
+            await User.updateOne(
+                { _id: userId },
+                {
+                    $inc: {
+                        "wallet.balance": requestedAmount,
+                        "wallet.pendingBalance": -requestedAmount,
+                    },
+                },
+            );
+            throw err;
         }
-        user.wallet.balance = (Number(user.wallet.balance) || 0) - amount;
-        user.wallet.pendingBalance = (Number(user.wallet.pendingBalance) || 0) + amount;
-        user.walletBalance = user.wallet.balance;
-        user.pendingPayoutBalance = user.wallet.pendingBalance;
-        await user.save();
 
         return transaction;
     }
@@ -161,6 +191,17 @@ class TransactionService {
             if (!isSeller) {
                 throw new AppError("Only seller payouts can be processed", 400);
             }
+
+            // Atomic claim: only one approval can ever run for a payout (blocks double-click approvals)
+            const claimed = await Transaction.findOneAndUpdate(
+                { _id: transaction._id, status: "pending" },
+                { $set: { status: "processing" } },
+                { new: true },
+            );
+            if (!claimed) {
+                throw new AppError("Payout has already been processed or is being processed.", 400);
+            }
+            transaction = claimed;
 
             // Retrieve bank details from user profile or transaction snapshot
             let accountName =
@@ -253,7 +294,7 @@ class TransactionService {
                 }
             }
 
-            if (transferSuccess && paystackData) {
+            if (transferSuccess && paystackData && String(paystackData.status).toLowerCase() !== "otp") {
                 transaction.status = "completed";
                 transaction.transactionId =
                     paystackData.transfer_code || transaction.transactionId || additionalData.transactionId;
@@ -263,65 +304,150 @@ class TransactionService {
                     payoutMethod: "paystack_transfer",
                     paystackTransfer: paystackData,
                 };
-            } else {
-                // If Paystack automated transfer failed (e.g., inactive business/transfers disabled),
-                // approve the payout in the system as manual transfer so the admin is not blocked.
-                console.warn(`[processPayout] Paystack transfer skipped/failed: ${paystackErrorMsg}. Approving as manual payout.`);
+            } else if (additionalData.manual || additionalData.offline) {
+                // Explicit manual disbursement by the admin - a bank reference is mandatory
+                const bankReference = additionalData.transactionId || additionalData.bankReference;
+                if (!bankReference) {
+                    await Transaction.updateOne({ _id: transaction._id }, { $set: { status: "pending" } });
+                    throw new AppError(
+                        "A bank transaction reference is required to mark a payout as manually transferred.",
+                        400,
+                    );
+                }
                 transaction.status = "completed";
-                transaction.transactionId =
-                    additionalData.transactionId || transaction.transactionId || `MAN-${Date.now()}`;
+                transaction.transactionId = String(bankReference);
                 transaction.processedAt = new Date();
                 transaction.metadata = {
                     ...transaction.metadata,
                     payoutMethod: "manual_transfer",
-                    paystackError: paystackErrorMsg,
-                    note: paystackErrorMsg
-                        ? `Approved in system. Paystack automated transfer notice: ${paystackErrorMsg}`
-                        : "Approved manually by admin",
+                    note: additionalData.note || "Manually transferred by admin",
                 };
+            } else {
+                // Paystack failed: do NOT pretend the payout is completed. Release the claim
+                // so the payout stays pending and report the real reason to the admin.
+                const reason =
+                    paystackErrorMsg ||
+                    (paystackData && String(paystackData.status).toLowerCase() === "otp"
+                        ? "Paystack requires OTP confirmation for transfers (disable OTP in Paystack settings)"
+                        : "Unknown Paystack error");
+                console.error(`[processPayout] Paystack transfer failed for ${transaction.reference}: ${reason}`);
+                await Transaction.updateOne(
+                    { _id: transaction._id },
+                    {
+                        $set: {
+                            status: "pending",
+                            "metadata.lastPaystackError": reason,
+                            "metadata.lastPaystackErrorAt": new Date(),
+                        },
+                    },
+                );
+                throw new AppError(
+                    `Paystack transfer failed: ${reason}. The payout is still pending. Fix the issue and retry, or transfer manually and approve with { manual: true, transactionId: "<bank reference>" }.`,
+                    400,
+                );
             }
 
-            // Remove from pending balance safely
-            const sellerUser = await User.findById(transaction.user);
-            if (sellerUser) {
-                if (sellerUser.wallet) {
-                    sellerUser.wallet.pendingBalance = Math.max(
-                        0,
-                        (Number(sellerUser.wallet.pendingBalance) || 0) - transaction.amount,
-                    );
-                }
-                sellerUser.pendingPayoutBalance = Math.max(
-                    0,
-                    (Number(sellerUser.pendingPayoutBalance || sellerUser.wallet?.pendingBalance) || 0) - transaction.amount,
-                );
-                await sellerUser.save();
-            }
+            // Remove from pending balance (atomic, never below 0)
+            await User.updateOne({ _id: transaction.user }, [
+                {
+                    $set: {
+                        "wallet.pendingBalance": {
+                            $max: [0, { $subtract: [{ $ifNull: ["$wallet.pendingBalance", 0] }, transaction.amount] }],
+                        },
+                    },
+                },
+            ]);
         } else if (status === "failed" || status === "rejected") {
+            // Atomic claim so a payout can only be rejected/refunded once
+            const claimed = await Transaction.findOneAndUpdate(
+                { _id: transaction._id, status: "pending" },
+                { $set: { status: "processing" } },
+                { new: true },
+            );
+            if (!claimed) {
+                throw new AppError("Payout has already been processed.", 400);
+            }
+            transaction = claimed;
+
             transaction.status = "failed";
             transaction.failureReason = additionalData.failureReason || additionalData.reason || "Rejected by admin";
             transaction.rejectionReason = transaction.failureReason;
             transaction.processedAt = new Date();
 
-            // Return amount back to balance and remove from pending
-            const sellerUser = await User.findById(transaction.user);
-            if (sellerUser) {
-                if (!sellerUser.wallet) {
-                    sellerUser.wallet = { balance: 0, pendingBalance: 0, holdBalance: 0 };
-                }
-                sellerUser.wallet.balance =
-                    (Number(sellerUser.wallet.balance) || 0) + transaction.amount;
-                sellerUser.wallet.pendingBalance = Math.max(
-                    0,
-                    (Number(sellerUser.wallet.pendingBalance) || 0) - transaction.amount,
-                );
-                sellerUser.walletBalance = sellerUser.wallet.balance;
-                sellerUser.pendingPayoutBalance = sellerUser.wallet.pendingBalance;
-                await sellerUser.save();
-            }
+            // Return amount back to balance and remove from pending (atomic)
+            await User.updateOne({ _id: transaction.user }, [
+                {
+                    $set: {
+                        "wallet.balance": {
+                            $add: [{ $ifNull: ["$wallet.balance", 0] }, transaction.amount],
+                        },
+                        "wallet.pendingBalance": {
+                            $max: [0, { $subtract: [{ $ifNull: ["$wallet.pendingBalance", 0] }, transaction.amount] }],
+                        },
+                    },
+                },
+            ]);
         }
 
         await transaction.save();
         return transaction;
+    }
+
+    /**
+     * Revert a payout that was marked "completed" but never actually reached the bank.
+     * Atomically flips completed -> cancelled (so it can only happen once) and,
+     * optionally, returns the amount to the seller's available wallet balance.
+     * @param {string} transactionId - Transaction ID or reference
+     * @param {Object} options - { reason, refundToWallet = true, revertedBy }
+     */
+    async revertPayout(transactionId, options = {}) {
+        const { reason, refundToWallet = true, revertedBy } = options;
+
+        let transaction;
+        if (transactionId && typeof transactionId === "string" && transactionId.match(/^[0-9a-fA-F]{24}$/)) {
+            transaction = await Transaction.findById(transactionId);
+        }
+        if (!transaction) {
+            transaction = await Transaction.findOne({
+                $or: [{ reference: transactionId }, { transactionId: transactionId }],
+            });
+        }
+        if (!transaction || transaction.type !== "payout") {
+            throw new AppError("Payout not found", 404);
+        }
+
+        const reverted = await Transaction.findOneAndUpdate(
+            { _id: transaction._id, status: "completed" },
+            {
+                $set: {
+                    status: "cancelled",
+                    failureReason: reason || "Reverted by admin: transfer never reached the bank",
+                    processedAt: new Date(),
+                    "metadata.reverted": true,
+                    "metadata.revertedAt": new Date(),
+                    "metadata.revertedBy": revertedBy || null,
+                    "metadata.refundedToWallet": Boolean(refundToWallet),
+                },
+            },
+            { new: true },
+        );
+        if (!reverted) {
+            throw new AppError("Only completed payouts can be reverted.", 400);
+        }
+
+        if (refundToWallet) {
+            await User.updateOne({ _id: reverted.user }, [
+                {
+                    $set: {
+                        "wallet.balance": {
+                            $add: [{ $ifNull: ["$wallet.balance", 0] }, reverted.amount],
+                        },
+                    },
+                },
+            ]);
+        }
+
+        return reverted;
     }
 
     /**

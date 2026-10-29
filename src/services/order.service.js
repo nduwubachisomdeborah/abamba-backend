@@ -7,6 +7,7 @@ import PaginationUtil from "../utils/pagination.util.js";
 import mongoose from "mongoose";
 import paymentService from "./payment.service.js";
 import notificationService from "./notification.service.js";
+import { releaseSellerFunds } from "./sellerFunds.service.js";
 
 class OrderService {
     /**
@@ -319,7 +320,13 @@ class OrderService {
      * @returns {Promise<Object>} Updated order
      */
     async updateOrderStatus(orderId, status, userId, userRole, user = null) {
-        const order = await this.getOrderById(orderId, userId, userRole, user);
+        // getOrderById enforces authorization but returns a plain object (no .save()).
+        // Re-load the real Mongoose document to perform the update.
+        const orderView = await this.getOrderById(orderId, userId, userRole, user);
+        const order = await Order.findById(orderView._id);
+        if (!order) {
+            throw new AppError("Order not found", 404);
+        }
 
         const isAdmin =
             userRole === "admin" ||
@@ -352,6 +359,16 @@ class OrderService {
             refunded: [],
         };
 
+        // Idempotent: repeated "delivered" requests (double-click / retry) are a safe no-op
+        if (
+            status === "delivered" &&
+            (order.status === "delivered" ||
+                order.fundsReleased ||
+                order.sellerWalletStatus === "paid")
+        ) {
+            return order;
+        }
+
         if (!validTransitions[order.status]?.includes(status)) {
             throw new AppError(
                 `Cannot change order status from ${order.status} to ${status}`,
@@ -359,34 +376,40 @@ class OrderService {
             );
         }
 
+        // Persist the status FIRST (atomic, guarded by the expected current status)
+        // so a retry can never re-run the fund release for an already-delivered order.
+        const previousStatus = order.status;
+        const transitioned = await Order.findOneAndUpdate(
+            { _id: order._id, status: previousStatus },
+            { $set: { status } },
+            { new: true },
+        );
+        if (!transitioned) {
+            // Another request already changed this order; do not touch the wallet
+            return await Order.findById(order._id);
+        }
         order.status = status;
 
-        // If order is delivered, release funds from pending to available seller wallet balance
-        if (status === "delivered" && order.sellerWalletStatus === "pending") {
-            const creditAmount = Number(
-                order.sellerEarnings !== undefined && order.sellerEarnings !== null
-                    ? order.sellerEarnings
-                    : Math.max(0, Number(order.subtotal || 0) - Number(order.platformFee || 0))
-            );
-            if (order.seller && creditAmount > 0) {
-                const sellerUser = await User.findById(order.seller);
-                if (sellerUser) {
-                    if (!sellerUser.wallet) {
-                        sellerUser.wallet = { balance: 0, pendingBalance: 0, holdBalance: 0 };
-                    }
-                    sellerUser.wallet.balance =
-                        (Number(sellerUser.wallet.balance) || 0) + creditAmount;
-                    sellerUser.wallet.pendingBalance = Math.max(
-                        0,
-                        (Number(sellerUser.wallet.pendingBalance) || 0) - creditAmount,
+        // If order is delivered, release funds from pending to available seller wallet balance.
+        // Atomic + idempotent: credits the seller at most once. Creates NO payout records.
+        if (status === "delivered") {
+            try {
+                const release = await releaseSellerFunds(order._id);
+                if (release.released) {
+                    order.sellerWalletStatus = "paid";
+                    order.fundsReleased = true;
+                    await notificationService.send(
+                        release.sellerId,
+                        "Funds Released",
+                        `Order #${release.orderRef} has been delivered. **₦${release.amount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}** is now available for withdrawal.`,
                     );
-                    await sellerUser.save();
                 }
-                order.sellerWalletStatus = "paid";
-                await notificationService.send(
-                    order.seller,
-                    "Funds Released",
-                    `Order #${order.orderId || order._id} has been delivered. **₦${creditAmount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}** is now available for withdrawal.`,
+            } catch (err) {
+                // Roll back status so the admin can safely retry
+                await Order.updateOne({ _id: order._id }, { $set: { status: previousStatus } });
+                throw new AppError(
+                    "Could not release seller funds. Order status was not changed; please retry.",
+                    500,
                 );
             }
         }
@@ -395,9 +418,11 @@ class OrderService {
         if (status === "cancelled" || status === "refunded" || status === "abandoned") {
             order.payment.status =
                 status === "cancelled" ? "failed" : status === "abandoned" ? "abandoned" : "refunded";
+            await Order.updateOne(
+                { _id: order._id },
+                { $set: { "payment.status": order.payment.status } },
+            );
         }
-
-        await order.save();
 
         // Notify customer of order status change
         const statusMessages = {
