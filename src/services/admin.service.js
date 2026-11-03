@@ -1001,6 +1001,38 @@ class AdminService {
             }
         });
 
+        // Ensure proper types for vendor subscription toggles & commission rates
+        if (updateData.vendorSubscriptionEnabled !== undefined) {
+            settings.vendorSubscriptionEnabled = Boolean(
+                updateData.vendorSubscriptionEnabled === true ||
+                updateData.vendorSubscriptionEnabled === "true"
+            );
+        } else if (updateData.systemPreferences?.vendorSubscriptionEnabled !== undefined) {
+            settings.vendorSubscriptionEnabled = Boolean(updateData.systemPreferences.vendorSubscriptionEnabled);
+        }
+
+        if (updateData.bannerAdsMasterEnabled !== undefined) {
+            settings.bannerAdsMasterEnabled = Boolean(
+                updateData.bannerAdsMasterEnabled === true ||
+                updateData.bannerAdsMasterEnabled === "true"
+            );
+        } else if (updateData.systemPreferences?.bannerAdsMasterEnabled !== undefined) {
+            settings.bannerAdsMasterEnabled = Boolean(updateData.systemPreferences.bannerAdsMasterEnabled);
+        }
+
+        if (updateData.standardCommissionRate !== undefined) {
+            settings.standardCommissionRate = Number(updateData.standardCommissionRate);
+        }
+        if (updateData.tier1CommissionRate !== undefined) {
+            settings.tier1CommissionRate = Number(updateData.tier1CommissionRate);
+        }
+        if (updateData.tier2CommissionRate !== undefined) {
+            settings.tier2CommissionRate = Number(updateData.tier2CommissionRate);
+        }
+        if (updateData.tier3CommissionRate !== undefined) {
+            settings.tier3CommissionRate = Number(updateData.tier3CommissionRate);
+        }
+
         // Handle flat promotional flags
         if (updateData.bonusWeekEnabled !== undefined) {
             settings.isBonusEventActive = updateData.bonusWeekEnabled;
