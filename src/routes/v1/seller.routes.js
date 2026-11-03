@@ -8,6 +8,7 @@ import {
 import SellerController from "../../controllers/seller.contoller.js";
 import OrderController from "../../controllers/order.controller.js";
 import CustomerController from "../../controllers/customer.controller.js";
+import SellerSubscriptionController from "../../controllers/sellerSubscription.controller.js";
 import { loginUserSchema } from "../../validators/user.validator.js";
 import { payoutRequestSchema } from "../../validators/user.validator.js";
 import validate from "../../middlewares/validate.js";
@@ -173,5 +174,33 @@ router.delete(
 
 // Get followers and following lists
 router.get("/:sellerId/followers", SellerController.getSellerFollowers);
+
+// Vendor Subscription & Agreement
+router.post(
+    "/agreement/accept",
+    authenticate,
+    restrictTo("seller", "user", "buyer"),
+    SellerSubscriptionController.acceptAgreement
+);
+router.post(
+    "/subscription/verify",
+    authenticate,
+    restrictTo("seller", "user", "buyer"),
+    SellerSubscriptionController.verifySubscription
+);
+
+// Seller "Ads for Sales"
+router.post(
+    "/ads",
+    authenticate,
+    restrictTo("seller", "user", "buyer"),
+    SellerSubscriptionController.createAd
+);
+router.get(
+    "/ads/my-ads",
+    authenticate,
+    restrictTo("seller", "user", "buyer"),
+    SellerSubscriptionController.getMyAds
+);
 
 export default router;

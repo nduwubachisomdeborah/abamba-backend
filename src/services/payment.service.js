@@ -538,22 +538,6 @@ class PaymentService {
                     3000,
             );
 
-        // Evaluate dynamic platform settings for commission calculation
-        const commissionConfig = platformSettings?.commission;
-        const isExplicitlyEnabled = commissionConfig?.enabled === true;
-        const isPastStartDate = Boolean(
-            commissionConfig?.startDate &&
-            new Date() >= new Date(commissionConfig.startDate)
-        );
-        // Active if explicitly enabled by admin toggle OR if start date has arrived without being disabled
-        const isCommissionActive = Boolean(
-            isExplicitlyEnabled || (commissionConfig?.enabled !== false && isPastStartDate)
-        );
-        const feePercentage = isCommissionActive
-            ? Number(commissionConfig?.percentage ?? 1.5)
-            : 0;
-        const feeRate = feePercentage / 100;
-
         const savedOrders = [];
         for (const [sellerId, items] of groups.entries()) {
             const subtotal = items.reduce(
@@ -565,14 +549,39 @@ class PaymentService {
             const orderShipping = isPickupStation
                 ? 0
                 : (Number((shippingCost * share).toFixed(2)) || deliveryFee);
-            // Calculate platform fee and seller earnings from seller order subtotal
-            const platformFee = Number(
-                (subtotal * feeRate).toFixed(2),
-            );
-            const platformFeeRate = feePercentage;
-            const sellerEarnings = Number(
-                (subtotal - platformFee).toFixed(2),
-            );
+
+            // Freeze commission rate based on Master 3-Tier toggle & Seller subscription
+            let feeRate = platformSettings.standardCommissionRate !== undefined
+                ? platformSettings.standardCommissionRate
+                : 5.0; // Default flat 5%
+            if (platformSettings.vendorSubscriptionEnabled) {
+                const seller = await User.findById(sellerId);
+                switch (seller?.subscriptionPlan) {
+                    case "starter":
+                        feeRate = platformSettings.tier1CommissionRate !== undefined
+                            ? platformSettings.tier1CommissionRate
+                            : 6.0;
+                        break;
+                    case "growth":
+                        feeRate = platformSettings.tier2CommissionRate !== undefined
+                            ? platformSettings.tier2CommissionRate
+                            : 5.0;
+                        break;
+                    case "vip":
+                        feeRate = platformSettings.tier3CommissionRate !== undefined
+                            ? platformSettings.tier3CommissionRate
+                            : 4.0;
+                        break;
+                    default:
+                        feeRate = platformSettings.standardCommissionRate !== undefined
+                            ? platformSettings.standardCommissionRate
+                            : 5.0;
+                }
+            }
+
+            const platformFee = Math.round((subtotal * feeRate) / 100);
+            const sellerEarnings = subtotal - platformFee;
+            const platformFeeRate = feeRate;
             const total = subtotal + orderShipping;
 
             const order = new Order({

@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import PaymentService from "../services/payment.service.js";
+import User from "../models/user.model.js";
+import BannerAd from "../models/bannerAd.model.js";
 import { badResponse, successResponse } from "../utils/response.util.js";
 
 // Helper to get raw body if available
@@ -35,6 +37,19 @@ function verifyPaystackSignature(req, secret) {
 class PaymentController {
     async webhookPaystack(req, res) {
         try {
+            const secret = (
+                process.env.PAYSTACK_SECRET_KEY ||
+                process.env.PAYSTACK_API_KEY ||
+                ""
+            ).trim();
+
+            if (secret && req.headers["x-paystack-signature"]) {
+                const isValid = verifyPaystackSignature(req, secret);
+                if (!isValid) {
+                    console.warn("[PaystackWebhook] Invalid signature received");
+                }
+            }
+
             // Parse payload safely whether raw or json
             const payload = Buffer.isBuffer(req.body)
                 ? JSON.parse(req.body.toString("utf8"))
@@ -42,9 +57,11 @@ class PaymentController {
 
             // Only proceed for charge.success
             const event = payload?.event;
-            const reference = payload?.data?.reference || payload?.reference;
+            const data = payload?.data || {};
+            const reference = data?.reference || payload?.reference;
+            const metadata = data?.metadata || payload?.metadata || {};
 
-            console.log("[PaystackWebhook] Received:", { event, reference });
+            console.log("[PaystackWebhook] Received:", { event, reference, type: metadata?.type });
 
             if (!reference) {
                 return res
@@ -52,6 +69,75 @@ class PaymentController {
                     .json({ success: true, message: "Ignored: no reference" });
             }
 
+            // 1. Vendor Subscription Activation
+            if (metadata?.type === "vendor_subscription") {
+                const sellerId = metadata.sellerId || metadata.userId;
+                const sellerEmail = data.customer?.email || metadata.email;
+                const seller = sellerId
+                    ? await User.findById(sellerId)
+                    : (sellerEmail ? await User.findOne({ email: sellerEmail.toLowerCase() }) : null);
+
+                if (seller) {
+                    const planId = metadata.planId || "starter";
+                    seller.subscriptionPlan = planId;
+                    seller.subscriptionStatus = "active";
+                    seller.subscriptionPrice = (Number(data.amount) || 0) / 100;
+                    seller.subscriptionPaidAt = new Date();
+                    seller.subscriptionExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+                    seller.subscriptionReference = reference;
+                    await seller.save();
+                    console.log(`[PaystackWebhook] Vendor subscription activated for ${seller.email} (${planId})`);
+                }
+
+                return res.status(200).json({
+                    success: true,
+                    processed: true,
+                    event,
+                    reference,
+                    type: "vendor_subscription",
+                });
+            }
+
+            // 2. Banner Ad Payment Marking
+            if (metadata?.type === "banner_ad") {
+                const adId = metadata.adId || metadata.bannerAdId;
+                const ad = adId
+                    ? await BannerAd.findById(adId)
+                    : await BannerAd.findOne({ paymentReference: reference });
+
+                if (ad) {
+                    ad.paymentStatus = "paid";
+                    await ad.save();
+                    console.log(`[PaystackWebhook] Banner ad payment marked as paid: ${ad._id}`);
+                }
+
+                return res.status(200).json({
+                    success: true,
+                    processed: true,
+                    event,
+                    reference,
+                    type: "banner_ad",
+                });
+            }
+
+            // 3. Addon Boost Logging
+            if (metadata?.type === "addon_boost") {
+                console.log("[PaystackWebhook] Purchased addon boost:", {
+                    reference,
+                    amount: (Number(data.amount) || 0) / 100,
+                    metadata,
+                });
+
+                return res.status(200).json({
+                    success: true,
+                    processed: true,
+                    event,
+                    reference,
+                    type: "addon_boost",
+                });
+            }
+
+            // 4. Default: Standard Order Finalization
             const result = await PaymentService.verifyAndFinalizeByReference(
                 reference
             );

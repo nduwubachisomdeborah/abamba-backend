@@ -987,6 +987,12 @@ class AdminService {
             "logo",
             "favicon",
             "isBonusEventActive",
+            "vendorSubscriptionEnabled",
+            "standardCommissionRate",
+            "tier1CommissionRate",
+            "tier2CommissionRate",
+            "tier3CommissionRate",
+            "bannerAdsMasterEnabled",
         ];
 
         topLevelFields.forEach((field) => {

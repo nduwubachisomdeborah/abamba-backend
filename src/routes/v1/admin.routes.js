@@ -29,6 +29,7 @@ import {
     validateUpdateStoreLocation,
 } from "../../validators/admin.storeLocation.validator.js";
 import SettingsController from "../../controllers/settings.controller.js";
+import SellerSubscriptionController from "../../controllers/sellerSubscription.controller.js";
 import {
     getAllCompanies,
     getShippingStats,
@@ -415,5 +416,9 @@ router.put(
     validateUpdatePlatformSettings,
     SettingsController.updatePlatformSettings,
 );
+
+// Super Admin Banner Ads Review & Approval Routes
+router.get("/ads", authenticate, adminOnly, SellerSubscriptionController.getAllAds);
+router.patch("/ads/:id/status", authenticate, adminOnly, SellerSubscriptionController.updateAdStatus);
 
 export default router;

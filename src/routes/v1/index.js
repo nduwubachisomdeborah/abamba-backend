@@ -22,6 +22,7 @@ import webhookRoutes from "./webhook.routes.js";
 import aiRoutes from "./ai.routes.js";
 import logisticsRoutes from "./logistics.routes.js";
 import settingsRoutes from "./settings.routes.js";
+import adsRoutes from "./ads.routes.js";
 
 const router = Router();
 
@@ -52,6 +53,7 @@ router.use("/webhooks", webhookRoutes);
 router.use("/ai", aiRoutes);
 router.use("/logistics", logisticsRoutes);
 router.use("/settings", settingsRoutes);
+router.use("/ads", adsRoutes);
 
 // Health check route
 router.get("/health", (req, res) => {

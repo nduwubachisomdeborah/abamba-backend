@@ -233,6 +233,16 @@ const userSchema = new mongoose.Schema(
                 default: 0,
                 description: "Current balance",
             },
+            availableBalance: {
+                type: Number,
+                default: 0,
+                description: "Available balance for withdrawal",
+            },
+            totalEarnings: {
+                type: Number,
+                default: 0,
+                description: "Cumulative lifetime earnings",
+            },
             pendingBalance: {
                 type: Number,
                 default: 0,
@@ -303,6 +313,47 @@ const userSchema = new mongoose.Schema(
         suspended: {
             type: Boolean,
             default: false,
+        },
+        // Vendor Subscription & Merchant Agreement Tracking Fields
+        subscriptionPlan: {
+            type: String,
+            enum: ["starter", "growth", "vip", null],
+            default: null,
+        },
+        subscriptionStatus: {
+            type: String,
+            enum: ["none", "pending_payment", "active", "expired"],
+            default: "none",
+        },
+        subscriptionPrice: {
+            type: Number,
+            default: 0,
+        },
+        subscriptionPaidAt: {
+            type: Date,
+            default: null,
+        },
+        subscriptionExpiresAt: {
+            type: Date,
+            default: null,
+        },
+        subscriptionReference: {
+            type: String,
+            trim: true,
+            default: null,
+        },
+        merchantAgreementAccepted: {
+            type: Boolean,
+            default: false,
+        },
+        merchantAgreementAcceptedAt: {
+            type: Date,
+            default: null,
+        },
+        merchantAgreementVersion: {
+            type: String,
+            trim: true,
+            default: null,
         },
     },
     {

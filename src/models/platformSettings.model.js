@@ -104,6 +104,40 @@ const platformSettingsSchema = new mongoose.Schema(
             default: true,
         },
 
+        // Master 3-Tier Vendor Subscription & Commission Settings
+        vendorSubscriptionEnabled: {
+            type: Boolean,
+            default: false,
+        },
+        standardCommissionRate: {
+            type: Number,
+            default: 5.0,
+            min: 0,
+            max: 100,
+        },
+        tier1CommissionRate: {
+            type: Number,
+            default: 6.0,
+            min: 0,
+            max: 100,
+        },
+        tier2CommissionRate: {
+            type: Number,
+            default: 5.0,
+            min: 0,
+            max: 100,
+        },
+        tier3CommissionRate: {
+            type: Number,
+            default: 4.0,
+            min: 0,
+            max: 100,
+        },
+        bannerAdsMasterEnabled: {
+            type: Boolean,
+            default: true,
+        },
+
         // Seller Commission & Growth Promotion Configuration
         commission: {
             enabled: {
@@ -332,6 +366,12 @@ platformSettingsSchema.statics.getInstance = async function () {
                         percentage: 1.5,
                         startDate: new Date("2027-01-01T00:00:00.000Z"),
                     },
+                    vendorSubscriptionEnabled: false,
+                    standardCommissionRate: 5.0,
+                    tier1CommissionRate: 6.0,
+                    tier2CommissionRate: 5.0,
+                    tier3CommissionRate: 4.0,
+                    bannerAdsMasterEnabled: true,
                 });
             }
             return settings;

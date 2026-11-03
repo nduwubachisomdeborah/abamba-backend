@@ -40,6 +40,14 @@ export const updatePlatformSettingsSchema = Joi.object({
     platformFeeRate: Joi.number().min(0).max(100).optional(),
     platformFee: Joi.number().min(0).max(100).optional(),
     
+    // Master 3-Tier Vendor Subscription & Commission Settings
+    vendorSubscriptionEnabled: Joi.boolean().optional(),
+    standardCommissionRate: Joi.number().min(0).max(100).optional(),
+    tier1CommissionRate: Joi.number().min(0).max(100).optional(),
+    tier2CommissionRate: Joi.number().min(0).max(100).optional(),
+    tier3CommissionRate: Joi.number().min(0).max(100).optional(),
+    bannerAdsMasterEnabled: Joi.boolean().optional(),
+    
     // Social Media Links
     socialMedia: Joi.object({
         facebookUrl: Joi.string().uri().trim().optional().allow(""),

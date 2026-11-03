@@ -37,12 +37,18 @@ export async function releaseSellerFunds(orderId) {
     }
 
     try {
-        // Single atomic update (pipeline form) - moves pending -> balance, never below 0
+        // Single atomic update (pipeline form) - moves pending -> balance & availableBalance, updates totalEarnings
         const updated = await User.findByIdAndUpdate(claimed.seller, [
             {
                 $set: {
                     "wallet.balance": {
                         $add: [{ $ifNull: ["$wallet.balance", 0] }, amount],
+                    },
+                    "wallet.availableBalance": {
+                        $add: [{ $ifNull: ["$wallet.availableBalance", "$wallet.balance", 0] }, amount],
+                    },
+                    "wallet.totalEarnings": {
+                        $add: [{ $ifNull: ["$wallet.totalEarnings", 0] }, amount],
                     },
                     "wallet.pendingBalance": {
                         $max: [0, { $subtract: [{ $ifNull: ["$wallet.pendingBalance", 0] }, amount] }],

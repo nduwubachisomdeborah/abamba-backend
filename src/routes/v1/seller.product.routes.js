@@ -1,6 +1,7 @@
 import { Router } from "express";
 import SellerProductController from "../../controllers/seller.product.controller.js";
 import { authenticate, restrictTo } from "../../middlewares/auth.js";
+import checkVendorSubscriptionGate from "../../middlewares/subscriptionGate.js";
 import {
     productSchema,
     updateProductSchema,
@@ -20,17 +21,20 @@ router.get("/stats", SellerProductController.getSellerProductStats);
 router.get("/", SellerProductController.getSellerProducts);
 router.post(
     "/",
+    checkVendorSubscriptionGate,
     validate(productSchema),
     SellerProductController.createProduct
 );
 router.get("/:id", SellerProductController.getProduct);
 router.put(
     "/:id",
+    checkVendorSubscriptionGate,
     validate(updateProductSchema),
     SellerProductController.updateProduct
 );
 router.patch(
     "/:id",
+    checkVendorSubscriptionGate,
     validate(updateProductSchema),
     SellerProductController.updateProduct
 );

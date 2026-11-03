@@ -1,7 +1,9 @@
 import { Router } from "express";
 import ProductController from "../../controllers/product.controller.js";
+import SellerProductController from "../../controllers/seller.product.controller.js";
 import ReviewController from "../../controllers/review.controller.js";
 import CategoryOptionsController from "../../controllers/categoryOptions.controller.js";
+import checkVendorSubscriptionGate from "../../middlewares/subscriptionGate.js";
 import {
     validateCreateProduct,
     validateUpdateProduct,
@@ -59,10 +61,28 @@ router.get(
 );
 
 router.get("/", optionalAuth(authenticate), ProductController.getProducts);
+router.post(
+    "/",
+    authenticate,
+    checkVendorSubscriptionGate,
+    SellerProductController.createProduct
+);
 router.get(
     "/:id",
     optionalAuth(authenticate),
     ProductController.getProductById
+);
+router.patch(
+    "/:id",
+    authenticate,
+    checkVendorSubscriptionGate,
+    SellerProductController.updateProduct
+);
+router.put(
+    "/:id",
+    authenticate,
+    checkVendorSubscriptionGate,
+    SellerProductController.updateProduct
 );
 
 // Public variant routes

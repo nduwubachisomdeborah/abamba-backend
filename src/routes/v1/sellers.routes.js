@@ -12,8 +12,53 @@
 import express from "express";
 import { authenticate, restrictTo } from "../../middlewares/auth.js";
 import OrderController from "../../controllers/order.controller.js";
+import SellerSubscriptionController from "../../controllers/sellerSubscription.controller.js";
 
 const router = express.Router();
+
+/**
+ * POST /api/v1/sellers/agreement/accept
+ * Records merchant agreement acceptance
+ */
+router.post(
+    "/agreement/accept",
+    authenticate,
+    restrictTo("seller", "user", "buyer"),
+    SellerSubscriptionController.acceptAgreement
+);
+
+/**
+ * POST /api/v1/sellers/subscription/verify
+ * Verifies payment made via Paystack for Starter, Growth, or VIP plans
+ */
+router.post(
+    "/subscription/verify",
+    authenticate,
+    restrictTo("seller", "user", "buyer"),
+    SellerSubscriptionController.verifySubscription
+);
+
+/**
+ * POST /api/v1/sellers/ads
+ * Creates an ad placement with verified Paystack payment
+ */
+router.post(
+    "/ads",
+    authenticate,
+    restrictTo("seller", "user", "buyer"),
+    SellerSubscriptionController.createAd
+);
+
+/**
+ * GET /api/v1/sellers/ads/my-ads
+ * Returns list of ads submitted by this seller
+ */
+router.get(
+    "/ads/my-ads",
+    authenticate,
+    restrictTo("seller", "user", "buyer"),
+    SellerSubscriptionController.getMyAds
+);
 
 /**
  * GET /api/v1/sellers/orders
