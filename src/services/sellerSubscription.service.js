@@ -257,12 +257,17 @@ class SellerSubscriptionService {
     }
 
     /**
-     * Public Homepage: Get random active banner ad
+     * Public Homepage: Get active banner ads with fair-weighted rotation pool
      */
     async getLiveBanner() {
         const settings = await PlatformSettings.getInstance();
         if (!settings.bannerAdsMasterEnabled) {
-            return null;
+            return {
+                masterEnabled: false,
+                count: 0,
+                ad: null,
+                ads: [],
+            };
         }
 
         const now = new Date();
@@ -273,10 +278,39 @@ class SellerSubscriptionService {
         });
 
         if (!activeAds || activeAds.length === 0) {
-            return null;
+            return {
+                masterEnabled: true,
+                count: 0,
+                ad: null,
+                ads: [],
+            };
         }
 
-        return activeAds[Math.floor(Math.random() * activeAds.length)];
+        // Tier weight priority: mega_1m (3) > growth_7w (2) > flash_48h (1)
+        const tierWeights = {
+            mega_1m: 3,
+            growth_7w: 2,
+            flash_48h: 1,
+        };
+
+        // Shuffle within tiers for fair rotation across visitor sessions
+        const shuffled = [...activeAds].sort(() => Math.random() - 0.5);
+        shuffled.sort((a, b) => {
+            const weightA = tierWeights[a.packageId] || 1;
+            const weightB = tierWeights[b.packageId] || 1;
+            // Weighted ordering: higher tiers have priority while keeping rotation fair
+            if (Math.random() < 0.7) {
+                return weightB - weightA;
+            }
+            return 0;
+        });
+
+        return {
+            masterEnabled: true,
+            count: shuffled.length,
+            ad: shuffled[0] || null,
+            ads: shuffled,
+        };
     }
 }
 

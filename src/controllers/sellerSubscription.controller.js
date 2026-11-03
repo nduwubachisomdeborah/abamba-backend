@@ -92,15 +92,15 @@ class SellerSubscriptionController {
     });
 
     /**
-     * @desc    Get live homepage banner ad (Public)
+     * @desc    Get live homepage banner ads with rotation pool (Public)
      * @route   GET /api/v1/ads/live-banner
      * @access  Public
      */
     static getLiveBanner = asyncHandler(async (req, res) => {
-        const ad = await sellerSubscriptionService.getLiveBanner();
+        const result = await sellerSubscriptionService.getLiveBanner();
         return res.status(200).json({
             success: true,
-            ad,
+            ...result,
         });
     });
 }
